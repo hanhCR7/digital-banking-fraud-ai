@@ -49,7 +49,6 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels/ /wheels/* \
 COPY --chown=${APP_USER}:{APP_GROUP} ./backend/docker/local/fastapi/entrypoint.sh /entrypoint.sh
 COPY --chown=${APP_USER}:{APP_GROUP} ./backend/docker/local/fastapi/start.sh /start.sh
 
-
 RUN sed -i 's/\r$//g' /entrypoint.sh /start.sh && \
   chmod +x /entrypoint.sh /start.sh
 
