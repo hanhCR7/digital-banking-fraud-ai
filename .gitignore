@@ -1,8 +1,14 @@
-.vscode
+# Editor
+.vscode/
+.idea/
 .DS_Store
-.idea
-.envs/.env.local
+
+# Env files
+.env
+.env.*
+.envs/.env*
 !.envs/.env.example
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
