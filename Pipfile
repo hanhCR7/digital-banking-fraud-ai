@@ -14,6 +14,14 @@ pydantic-settings = "*"
 greenlet = "*"
 loguru = "*"
 docker = "*"
+redis = "*"
+celery = "*"
+flower = "*"
+redisbeat = "*"
+jsonpickle = "*"
+fastapi-mail = "*"
+aiosmtplib = "*"
+email-validator = "*"
 
 [dev-packages]
 
