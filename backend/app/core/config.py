@@ -33,4 +33,12 @@ class Setting(BaseSettings):
     RABBITMQ_USER: str = "guest"
     RABBITMQ_PASSWORD: str = "guest"
 
+    # User settings
+    # thời gian hết hạn của mã OTP
+    OTP_EXPIRE_MINUTES: int = 2 if ENVIRONMENT == "local" else 5
+    #số lần thử đăng nhập tối đa trước khi bị khóa tài khoản
+    LOGIN_ATTEMPTS: int = 3
+    # thời gian khóa tài khoản sau khi vượt quá số lần thử đăng nhập.
+    LOCKOUT_DURATION_MINUTES: int = 2 if ENVIRONMENT == "local" else 5
+
 settings = Setting()
