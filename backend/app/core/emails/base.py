@@ -19,7 +19,7 @@ class EmailTemplate:
     subject: str
 
     @classmethod
-    async def send_mail(
+    async def send_email(
         cls, email_to: str | list[str], context: dict, subject_override: str | None = None
     ) -> None:
         try:

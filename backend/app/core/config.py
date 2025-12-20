@@ -40,5 +40,11 @@ class Setting(BaseSettings):
     LOGIN_ATTEMPTS: int = 3
     # thời gian khóa tài khoản sau khi vượt quá số lần thử đăng nhập.
     LOCKOUT_DURATION_MINUTES: int = 2 if ENVIRONMENT == "local" else 5
-
+    # thời gian hết hạn của token kích hoạt tài khoản
+    ACTIVATION_TOKEN_EXPIRATION_MINUTES: int = 2 if ENVIRONMENT == "local" else 5
+    API_BASE_URL: str = ""
+    SUPPORT_EMAIL: str = ""
+    # JWT settings
+    JWT_SECRET_KEY: str = ""
+    JWT_ALGORITHM: str = "HS256"
 settings = Setting()

@@ -1,4 +1,5 @@
 from enum import Enum
+import uuid
 from sqlmodel import SQLModel, Field
 from pydantic import EmailStr, field_validator
 from fastapi import HTTPException, status
@@ -18,17 +19,18 @@ def get_description(cls, value: "SecurityQuestionsSchema") -> str:
             cls.BIRTH_CITY: "What is the name of the city you were born in?",# Hỏi nơi sinh?
         }
     return descriptions.get(value, "Unknown security question")
+
 class AccountStatusSchema(str, Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     LOCKED = "locked"
     PENDING = "pending"
 
-
+# định nghĩa vai trò (role) của người dùng trong hệ thống
 class RoleChoicesSchema(str, Enum):
     CUSTOMER = "customer" # khách hàng
-    ACCOUNT_EXECUTIVE = "account_executive"# nhân cvieen phụ trách TK
-    BRANCH_MANAGER = "branch_manager"# giám đốc chi nhánh
+    ACCOUNT_EXECUTIVE = "account_executive"# Nhân viên chăm sóc khách hàng
+    BRANCH_MANAGER = "branch_manager"# Quản lý chi nhánh
     ADMIN = "admin"# QTV
     SUPER_ADMIN = "super_admin"# QTV cấp cao
     TELLER = "teller"# giao dịch viên
@@ -39,7 +41,7 @@ class BaseUserSchema(SQLModel):
     first_name: str = Field(max_length=30)
     middle_name: str | None = Field(max_length=30, default=None)
     last_name: str = Field(max_length=30)
-    id_no: int = Field(unique=True, gt=0)
+    id_no: int = Field(unique=True, gt=0)# Số giấy tờ tùy thân (CCCD/CMND)
     is_active: bool = False
     is_superuser: bool = False
     security_question: SecurityQuestionsSchema = Field(max_length=30)
@@ -63,3 +65,24 @@ class UserCreateSchema(BaseUserSchema):
                 },
             )
         return v
+# Schema dùng để trả về thông tin user (không bao gồm password)
+class UserReadSchema(BaseUserSchema):
+    id: uuid.UUID
+    full_name: str
+# Schema yêu cầu gửi email (OTP, reset mật khẩu, xác minh)
+class EmailRequestSchema(SQLModel):
+    email: EmailStr
+# Schema đăng nhập bằng email và mật khẩu
+class LoginRequestSchema(SQLModel):
+    email: EmailStr
+    password: str = Field(
+        min_length=8,
+        max_length=40
+    )
+# xác minh mã OTP
+class OTPVerifyRequestSchema(SQLModel):
+    email: EmailStr
+    otp: str = Field(
+        min_length=6,
+        max_length=6
+    )

@@ -22,6 +22,7 @@ jsonpickle = "*"
 fastapi-mail = "*"
 aiosmtplib = "*"
 email-validator = "*"
+pyjwt = "*"
 
 [dev-packages]
 

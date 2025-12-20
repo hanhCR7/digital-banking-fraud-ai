@@ -1,6 +1,8 @@
 import random
 import string
-
+import uuid
+import jwt
+from datetime import datetime, timedelta, timezone
 from backend.app.core.config import settings
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
@@ -40,3 +42,22 @@ def generate_username() -> str:
     # Kết hợp tiền tố và phần ngẫu nhiên để tạo tên người dùng
     username = f"{prefix}-{random_string}"
     return username
+
+def create_activation_token(id: uuid.UUID) -> str:
+    """
+    Tạo JWT token dùng cho việc kích hoạt tài khoản người dùng
+    Token này sẽ được gửi kèm trong email kích hoạt
+    """
+    # Payload (nội dung) của JWT
+    payload = {
+        "id": str(id),  # ID người dùng (chuyển sang string để serialize)
+        "type": "activation", # Chuyển trạng thái user -> kích hoạt
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.ACTIVATION_TOKEN_EXPIRATION_MINUTES),# Thời điểm token hết hạn (expiration time)
+        "iat": datetime.now(timezone.utc),# Thời điểm token được tạo (issued at)
+    }
+    # Mã hóa payload thành JWT
+    return jwt.encode(
+        payload,
+        settings.JWT_SECRET_KEY,
+        algorithm=settings.JWT_ALGORITHM
+    )
