@@ -4,7 +4,7 @@ from backend.app.core.config import settings
 from sqlalchemy import text
 from sqlalchemy.pool import AsyncAdaptedQueuePool
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 from backend.app.core.logging import get_logger
 
 

@@ -60,7 +60,6 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 python-multipart==0.0.20
 pytz==2025.2
-pywin32==311
 PyYAML==6.0.3
 redis==7.1.0
 redisbeat==1.2.6
