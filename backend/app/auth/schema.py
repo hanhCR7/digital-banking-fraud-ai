@@ -86,3 +86,33 @@ class OTPVerifyRequestSchema(SQLModel):
         min_length=6,
         max_length=6
     )
+
+# Schema yêu cầu đặt lại mật khẩu
+class PasswordResetRequestSchema(SQLModel):
+    email: EmailStr
+
+# Schema xác nhận đặt lại mật khẩu
+class PasswordResetConfirmSchema(SQLModel):
+    new_password: str = Field(
+        ...,
+        min_length=8,
+        max_length=40,
+    )
+    confirm_password: str = Field(
+        ...,
+        min_length=8,
+        max_length=40,
+    )
+    # Xác minh mật khẩu mới và xác nhận mật khẩu có khớp nhau không
+    @field_validator("confirm_password")
+    def validate_password_match(cls, v, values):
+        if "new_password" in values.data and v != values.data["new_password"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "status": "error",
+                    "message": "Passwords do not match",
+                    "action": "Please ensure that the passwords you entered match",
+                },
+            )
+        return v

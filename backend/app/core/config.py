@@ -61,4 +61,6 @@ class Setting(BaseSettings):
     COOKIE_SAMESITE: str = "lax"
     COOKIE_PATH: str = "/"
     SIGNING_KEY: str = ""
+    # THời t=gian hết hạn token đặt lại pass
+    PASSWORD_RESET_TOKEN_EXPIRATION_MINUTES: int = 3 if ENVIRONMENT == "local" else 5
 settings = Setting()

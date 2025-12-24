@@ -134,3 +134,15 @@ def delete_auth_cookies(response: Response) -> None:
     response.delete_cookie(settings.COOKIE_REFRESH_NAME)
     # Xoá cookie trạng thái đăng nhập dùng cho frontend
     response.delete_cookie(settings.COOKIE_LOGGED_IN_NAME)
+# Tạo token đặt lại mật khẩu
+def create_password_reset_token(id: uuid.UUID) -> str:
+    """"Tạo token dùng trong việc đặt lại mật khẩu"""
+    payload = {
+        "id": str(id),
+        "type": "password_reset",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.PASSWORD_RESET_TOKEN_EXPIRATION_MINUTES),
+        "iat": datetime.now(timezone.utc)
+    }
+    return jwt.encode(
+        payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+    )

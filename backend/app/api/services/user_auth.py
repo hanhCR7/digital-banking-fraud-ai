@@ -445,5 +445,46 @@ class UserAuthService:
             )
         await session.commit()
         await session.refresh(user)
+    # Đặt lại mật khẩu cho người dùng
+    async def reset_password(
+        self,
+        token: str,
+        new_password: str,
+        session: AsyncSession,
+    ) -> None:
+        try:
+            # Giải mã JWT token
+            payload = jwt.decode(
+                token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+            )
+            if payload.get("type") != "password_reset":
+                raise ValueError("Invalid reset token")
+            # Lấy user ID từ payload
+            user_id = uuid.UUID(payload["id"])
+            # Lấy user kể cả khi chưa active
+            user = await self.get_user_by_id(user_id, session, include_inactive=True)
+            # Không tìm thấy user
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail={"status": "error", "message": "User not found"},
+                )
+            # Cập nhật pass mới
+            user.hashed_password = generate_password_hash(new_password)
+            # Reset trạng thái bảo mật
+            await self.reset_user_state(user, session, clear_otp=True, log_action=True)
+
+            await session.commit()
+            await session.refresh(user)
+
+            logger.info(f"Password reset successful for user {user.email}")
+
+        except jwt.ExpiredSignatureError:
+            raise ValueError("Password reset token expired")
+        except jwt.InvalidTokenError:
+            raise ValueError("Invalid password reset token")
+        except Exception as e:
+            logger.error(f"Failed to reset password: {e} ")
+            raise
         
 user_auth_service = UserAuthService()
