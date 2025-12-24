@@ -47,4 +47,18 @@ class Setting(BaseSettings):
     # JWT settings
     JWT_SECRET_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"
+    # Thời gian hết hận access token
+    JWT_ACCESS_TOKEN_EXPIRATION_MINUTES: int = 30 if ENVIRONMENT == "local" else 15
+    # thời gian hết hạn refresh token
+    JWT_REFRESH_TOKEN_EXPIRATION_DAYS: int = 1
+    # Cookie settings
+    COOKIE_SECURE: bool = False if ENVIRONMENT == "local" else True
+    COOKIE_ACCESS_NAME: str = "access_token"
+    COOKIE_REFRESH_NAME: str = "refresh_token"
+    COOKIE_LOGGED_IN_NAME: str = "logged_in"
+    # cấu hình SameSite cho cookie, có thể là 'lax', 'strict' hoặc 'none'
+    COOKIE_HTTP_ONLY: bool = True
+    COOKIE_SAMESITE: str = "lax"
+    COOKIE_PATH: str = "/"
+    SIGNING_KEY: str = ""
 settings = Setting()
