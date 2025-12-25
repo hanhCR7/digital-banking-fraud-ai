@@ -1,15 +1,14 @@
 from fastapi import APIRouter
 
 from backend.app.api.routes import home
-from backend.app.api.routes.auth import activate, register, login, password_reset, refresh
-# from backend.app.api.routes.auth import (
-#     activate,
-#     login,
-#     logout,
-#     password_reset,
-#     refresh,
-#     register,
-# )
+from backend.app.api.routes.auth import (
+    activate,
+    login,
+    logout,
+    password_reset,
+    refresh,
+    register,
+)
 # from backend.app.api.routes.bank_account import activate as bank_account_activate
 # from backend.app.api.routes.bank_account import create as create_bank_account
 # from backend.app.api.routes.bank_account import (
@@ -40,7 +39,7 @@ api_router.include_router(activate.router)
 api_router.include_router(login.router)
 api_router.include_router(password_reset.router)
 api_router.include_router(refresh.router)
-# api_router.include_router(logout.router)
+api_router.include_router(logout.router)
 # api_router.include_router(create.router)
 # api_router.include_router(update.router)
 # api_router.include_router(upload.router)
