@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, ClassVar, Optional
+from typing import TYPE_CHECKING, ClassVar
 from pydantic import computed_field
 from sqlalchemy import func, text
 from sqlalchemy.dialects import postgresql as pg
@@ -45,7 +45,7 @@ class User(BaseUserSchema, table=True):
         ),
     )
     # Mối quan hệ một-một với Profile
-    profile: Optional["Profile"] = Relationship(
+    profile: "Profile" = Relationship(
         back_populates="user",
         sa_relationship_kwargs={
             "uselist": False,
