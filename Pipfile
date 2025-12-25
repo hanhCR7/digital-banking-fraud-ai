@@ -23,6 +23,12 @@ fastapi-mail = "*"
 aiosmtplib = "*"
 email-validator = "*"
 pyjwt = "*"
+cloudinary = "*"
+python-multipart = "*"
+pydantic-extra-types = "*"
+pycountry = "*"
+phonenumbers = "*"
+pillow = "*"
 
 [dev-packages]
 

@@ -44,7 +44,7 @@ services:
     image: docker.io/axllent/mailpit:latest
     ports:
       - "8025:8025"
-      - "1025:1025"
+      - "11025:1025"
     volumes:
       - nextgen_mailpit_data:/data
     environment:

@@ -1,11 +1,13 @@
 import uuid
-from typing import ClassVar
 from datetime import datetime, timezone
-from sqlmodel import Field, Column
+from typing import TYPE_CHECKING, ClassVar, Optional
 from pydantic import computed_field
+from sqlalchemy import func, text
 from sqlalchemy.dialects import postgresql as pg
-from sqlalchemy import text, func
+from sqlmodel import Column, Field, Relationship
 from backend.app.auth.schema import BaseUserSchema, RoleChoicesSchema
+if TYPE_CHECKING:
+    from backend.app.user_profile.models import Profile
 
 class User(BaseUserSchema, table=True):
     __tablename__: ClassVar[str] = "users"
@@ -41,6 +43,14 @@ class User(BaseUserSchema, table=True):
             nullable=False,
             onupdate=func.current_timestamp(),
         ),
+    )
+    # Mối quan hệ một-một với Profile
+    profile: Optional["Profile"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={
+            "uselist": False,
+            "lazy": "selectin",
+        },
     )
     @computed_field
     @property

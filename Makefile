@@ -1,14 +1,15 @@
 build:
-	docker compose -f local.yml up --build -d --remove-orphans
+	docker compose -p nextgen -f local.yml up --build -d --remove-orphans
+
 
 up:
-	docker compose -f local.yml up -d
+	docker compose -p nextgen -f local.yml up -d
 
 down-v:
 	docker compose -f local.yml down -v
 
 down:
-	docker compose -f local.yml down
+	docker compose -p nextgen -f local.yml down
 
 nextgen-config:
 	docker compose -f local.yml config
