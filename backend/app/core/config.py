@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Literal
-
+import cloudinary
 
 
 class Setting(BaseSettings):
@@ -63,4 +63,18 @@ class Setting(BaseSettings):
     SIGNING_KEY: str = ""
     # THời t=gian hết hạn token đặt lại pass
     PASSWORD_RESET_TOKEN_EXPIRATION_MINUTES: int = 3 if ENVIRONMENT == "local" else 5
+    # Cloudinary settings
+    CLOUDINARY_CLOUD_NAME: str = ""
+    CLOUDINARY_API_KEY: str = ""
+    CLOUDINARY_API_SECRET: str = ""
+    # Cấu hình Cloudinary
+    ALLOWED_MIME_TYPES: list[str] = ["image/jpeg", "image/png", "image/jpg"]
+    MAX_FILE_SIZE: int = 5 * 1024 * 1024
+    MAX_DIMENSION: int = 4096
 settings = Setting()
+# Cấu hình Cloudinary khi khởi động ứng dụng
+cloudinary.config(
+    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+    api_key=settings.CLOUDINARY_API_KEY,
+    api_secret=settings.CLOUDINARY_API_SECRET,
+)
