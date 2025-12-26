@@ -18,7 +18,7 @@ makemigrations:
 	docker compose -f local.yml exec -it api alembic revision --autogenerate -m "$(name)"
 
 migrate:
-	docker compose -f local.yml exec -it api alembic upgrade head
+	docker compose -p nextgen -f local.yml exec -it api alembic upgrade head
 
 history:
 	docker compose -f local.yml exec -it api alembic history
@@ -33,6 +33,6 @@ inspect-network:
 	docker network inspect nextgen_local_nw
 
 psql:
-	docker compose -f local.yml exec -it postgres psql -U postgres -d nextgen_fastapi_bank
+	docker compose -p nextgen -f local.yml exec -it postgres psql -U postgres -d nextgen_fastapi_bank
 
 
