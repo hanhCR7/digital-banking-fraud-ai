@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 
 
 class Profile(ProfileBaseSchema, table=True):
-    __tablename__: ClassVar[str] = "user_profiles"
     id: uuid.UUID = Field(
         sa_column=Column(
             pg.UUID(as_uuid=True),
