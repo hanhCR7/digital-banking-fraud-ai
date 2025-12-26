@@ -30,7 +30,7 @@ from backend.app.api.routes.auth import (
 # from backend.app.api.routes.next_of_kin import update as update_next_of_kin
 # from backend.app.api.routes.profile import all_profiles, create, me, update, upload
 # from backend.app.api.routes.transaction import fraud_review, risk_history
-from backend.app.api.routes.profile import create
+from backend.app.api.routes.profile import create, update
 
 api_router = APIRouter()
 
@@ -42,7 +42,7 @@ api_router.include_router(password_reset.router)
 api_router.include_router(refresh.router)
 api_router.include_router(logout.router)
 api_router.include_router(create.router)
-# api_router.include_router(update.router)
+api_router.include_router(update.router)
 # api_router.include_router(upload.router)
 # api_router.include_router(me.router)
 # api_router.include_router(all_profiles.router)
