@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import HTTPException, status
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from backend.app.core.logging import get_logger
 from backend.app.core.tasks.image_upload import upload_profile_image_task
@@ -10,7 +10,8 @@ from backend.app.user_profile.models import Profile
 from backend.app.auth.models import User
 from backend.app.user_profile.schema import (
     ProfileCreateSchema,
-    ProfileUpdateSchema
+    ProfileUpdateSchema,
+    RoleChoicesSchema
 )
 
 logger = get_logger()
@@ -203,50 +204,51 @@ async def get_user_with_profile(user_id: uuid.UUID, session: AsyncSession) -> Us
         )
 
 
-# async def get_all_user_profiles(
-#     session: AsyncSession,
-#     current_user: User,
-#     skip: int = 0,
-#     limit: int = 20,
-# ) -> tuple[list[User], int]:
-#     try:
-#         if current_user.role != RoleChoicesSchema.BRANCH_MANAGER:
-#             raise HTTPException(
-#                 status_code=status.HTTP_403_FORBIDDEN,
-#                 detail={
-#                     "status": "error",
-#                     "message": "Access denied",
-#                     "action": "Only branch managers can access all profiles",
-#                 },
-#             )
+async def get_all_user_profiles(
+    session: AsyncSession,
+    current_user: User,
+    skip: int = 0,
+    limit: int = 20,
+) -> tuple[list[User], int]:
+    """Lấy danh sách toàn bộ người dùng kèm profile (có phân quyền)."""
+    try:
+        # Nếu không phải là quản lý chi nhánh thì không có quyền truy cập
+        if current_user.role != RoleChoicesSchema.BRANCH_MANAGER:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "status": "error",
+                    "message": "Access denied",
+                    "action": "Only branch managers can access all profiles",
+                },
+            )
+        # Truy vấn tổng số người dùng để phục vụ phân trang
+        count_statement = select(User)
+        # Thực thi query và lấy tổng số bản ghi
+        result = await session.exec(count_statement)
+        total_count = len(result.all())
+        # Truy vấn danh sách user theo phân trang và sắp xếp mới nhất
+        statement = (
+            select(User).offset(skip).limit(limit).order_by(col(User.created_at).desc())
+        )
+        result = await session.exec(statement)
+        # Lấy danh sách user từ kết quả truy vấn
+        users = result.all()
+        # Load quan hệ profile cho từng user
+        for user in users:
+            await session.refresh(user, ["profile"])
+        # Trả về danh sách user và tổng số bản ghi
+        return list(users), total_count
 
-#         count_statement = select(User)
-
-#         result = await session.exec(count_statement)
-
-#         total_count = len(result.all())
-
-#         statement = (
-#             select(User).offset(skip).limit(limit).order_by(col(User.created_at).desc())
-#         )
-#         result = await session.exec(statement)
-
-#         users = result.all()
-
-#         for user in users:
-#             await session.refresh(user, ["profile"])
-
-#         return list(users), total_count
-
-#     except HTTPException as http_ex:
-#         raise http_ex
-#     except Exception as e:
-#         logger.error(f"Error fetching all user profiles: {e}")
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail={
-#                 "status": "error",
-#                 "message": "Failed to fetch user profiles",
-#                 "action": "Please try again later",
-#             },
-#         )
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        logger.error(f"Error fetching all user profiles: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "status": "error",
+                "message": "Failed to fetch user profiles",
+                "action": "Please try again later",
+            },
+        )

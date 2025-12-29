@@ -96,9 +96,9 @@ class ProfileResponseSchema(SQLModel):
     class Config:
         from_attributes = True
 
-# # Phân trang phản hồi hồ sơ người dùng
-# class PaginatedProfileResponseSchema(SQLModel):
-#     profiles: list[ProfileResponseSchema]
-#     total: int
-#     skip: int
-#     limit: int
+# Phân trang phản hồi hồ sơ người dùng
+class PaginatedProfileResponseSchema(SQLModel):
+    profiles: list[ProfileResponseSchema]
+    total: int
+    skip: int
+    limit: int

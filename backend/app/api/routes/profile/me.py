@@ -9,7 +9,7 @@ from backend.app.user_profile.schema import ProfileResponseSchema
 
 logger = get_logger()
 
-router = APIRouter(prefix="/profile")
+router = APIRouter(prefix="/profile", tags=["Profile"])
 
 
 @router.get("/me", response_model=ProfileResponseSchema, status_code=status.HTTP_200_OK)
