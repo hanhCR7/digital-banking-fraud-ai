@@ -26,7 +26,6 @@ async def create_profile(
         profile = await create_user_profile(
             user_id=current_user.id, profile_data=profile_data, session=session
         )
-
         logger.info(f"Created profile for {current_user.email}")
         return profile
 
