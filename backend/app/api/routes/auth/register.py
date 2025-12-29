@@ -6,7 +6,7 @@ from backend.app.auth.schema import UserCreateSchema, UserReadSchema
 from backend.app.api.services.user_auth import user_auth_service
 
 logger = get_logger()
-router = APIRouter(prefix="/auth")
+router = APIRouter(prefix="/auth", tags=["Athentication"])
 
 
 @router.post("/register",response_model=UserReadSchema,status_code=status.HTTP_201_CREATED,)

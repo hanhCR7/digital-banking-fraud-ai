@@ -11,7 +11,7 @@ from backend.app.core.services.activation_email import send_activation_email
 
 logger = get_logger()
 
-router = APIRouter(prefix="/auth")
+router = APIRouter(prefix="/auth", tags=["Athentication"])
 
 
 @router.get("/activate/{token}", status_code=status.HTTP_200_OK)

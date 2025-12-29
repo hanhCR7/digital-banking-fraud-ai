@@ -10,7 +10,7 @@ from backend.app.core.logging import get_logger
 
 logger = get_logger()
 
-router = APIRouter(prefix="/auth")
+router = APIRouter(prefix="/auth", tags=["Athentication"])
 
 
 @router.post("/refresh", status_code=status.HTTP_200_OK)
