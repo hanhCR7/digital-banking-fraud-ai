@@ -82,19 +82,19 @@ class ProfileUpdateSchema(ProfileBaseSchema):
             validate_id_dates(values.data["id_issue_date"], v)
         return v
 
-# # Phản hồi hồ sơ người dùng
-# class ProfileResponseSchema(SQLModel):
-#     username: str
-#     first_name: str
-#     middle_name: str
-#     last_name: str
-#     email: str
-#     id_no: str
-#     role: RoleChoicesSchema
-#     profile: ProfileBaseSchema | None
+# Phản hồi hồ sơ người dùng
+class ProfileResponseSchema(SQLModel):
+    username: str
+    first_name: str
+    middle_name: str
+    last_name: str
+    email: str
+    id_no: str
+    role: RoleChoicesSchema
+    profile: ProfileBaseSchema | None
 
-#     class Config:
-#         from_attributes = True
+    class Config:
+        from_attributes = True
 
 # # Phân trang phản hồi hồ sơ người dùng
 # class PaginatedProfileResponseSchema(SQLModel):
