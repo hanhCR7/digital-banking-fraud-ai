@@ -1,18 +1,15 @@
 import uuid
 
 from fastapi import HTTPException, status
-from sqlmodel import col, select
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
-
-from backend.app.auth.models import User
 from backend.app.core.logging import get_logger
-# from backend.app.core.tasks.image_upload import upload_profile_image_task
+from backend.app.core.tasks.image_upload import upload_profile_image_task
 from backend.app.user_profile.enums import ImageTypeEnum
 from backend.app.user_profile.models import Profile
 from backend.app.user_profile.schema import (
     ProfileCreateSchema,
-    ProfileUpdateSchema,
-    RoleChoicesSchema,
+    ProfileUpdateSchema
 )
 
 logger = get_logger()
@@ -109,68 +106,74 @@ async def update_user_profile(
         )
 
 
-# def initiate_image_upload(
-#     file_content: bytes,
-#     image_type: ImageTypeEnum,
-#     content_type: str,
-#     user_id: uuid.UUID,
-# ) -> str:
-#     try:
-#         task = upload_profile_image_task.delay(
-#             file_content, image_type.value, str(user_id), content_type
-#         )
-#         return task.id
-#     except Exception as e:
-#         logger.error(f"Error initiating image upload: {str(e)}", exc_info=True)
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail={"status": "error", "message": "Failed to initiate image upload"},
-#         )
+def initiate_image_upload(
+    file_content: bytes,
+    image_type: ImageTypeEnum,
+    content_type: str,
+    user_id: uuid.UUID,
+) -> str:
+    """Khởi tạo task upload ảnh hồ sơ người dùng lên Cloudinary."""
+    try:
+        # Gửi task upload ảnh sang Celery worker để xử lý bất đồng bộ
+        task = upload_profile_image_task.delay(
+            file_content, image_type.value, str(user_id), content_type
+        )
+        return task.id
+    except Exception as e:
+        logger.error(f"Error initiating image upload: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"status": "error", "message": "Failed to initiate image upload"},
+        )
 
 
-# async def update_profile_image_url(
-#     user_id: uuid.UUID,
-#     image_type: ImageTypeEnum,
-#     image_url: str,
-#     session: AsyncSession,
-# ) -> Profile:
-#     try:
-#         profile = await get_user_profile(user_id, session)
-#         if not profile:
-#             raise HTTPException(
-#                 status_code=status.HTTP_404_NOT_FOUND,
-#                 detail={
-#                     "status": "error",
-#                     "message": "Profile not found",
-#                     "action": "Please create a profile first",
-#                 },
-#             )
-#         field_mapping = {
-#             ImageTypeEnum.PROFILE_PHOTO: "profile_photo_url",
-#             ImageTypeEnum.ID_PHOTO: "id_photo_url",
-#             ImageTypeEnum.SIGNATURE_PHOTO: "signature_photo_url",
-#         }
+async def update_profile_image_url(
+    user_id: uuid.UUID,
+    image_type: ImageTypeEnum,
+    image_url: str,
+    session: AsyncSession,
+) -> Profile:
+    """ Cập nhật URL ảnh tương ứng trong hồ sơ người dùng."""
+    try:
+        # Lấy thông tin hồ sơ người dùng theo user_id
+        profile = await get_user_profile(user_id, session)
+        # Nếu người dùng chưa có hồ sơ thì không thể cập nhật ảnh
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "status": "error",
+                    "message": "Profile not found",
+                    "action": "Please create a profile first",
+                },
+            )
+        # Ánh xạ loại ảnh sang trường tương ứng trong bảng Profile
+        field_mapping = {
+            ImageTypeEnum.PROFILE_PHOTO: "profile_photo_url",
+            ImageTypeEnum.ID_PHOTO: "id_photo_url",
+            ImageTypeEnum.SIGNATURE_PHOTO: "signature_photo_url",
+        }
+        # Kiểm tra image_type có hợp lệ hay không
+        field_name = field_mapping.get(image_type)
 
-#         field_name = field_mapping.get(image_type)
+        if not field_name:
+            raise ValueError(f"Invalid image type: {image_type}")
+        # Gán động URL ảnh vào đúng trường của profile
+        setattr(profile, field_name, image_url)
 
-#         if not field_name:
-#             raise ValueError(f"Invalid image type: {image_type}")
+        await session.commit()
 
-#         setattr(profile, field_name, image_url)
+        await session.refresh(profile)
 
-#         await session.commit()
-
-#         await session.refresh(profile)
-
-#         return profile
-#     except HTTPException as http_ex:
-#         raise http_ex
-#     except Exception as e:
-#         logger.error(f"Error updating profile image url: {str(e)}")
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail={"status": "error", "message": "Failed to update profile image url"},
-#         )
+        return profile
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        logger.error(f"Error updating profile image url: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"status": "error", "message": "Failed to update profile image url"},
+        )
 
 
 # async def get_user_with_profile(user_id: uuid.UUID, session: AsyncSession) -> User:

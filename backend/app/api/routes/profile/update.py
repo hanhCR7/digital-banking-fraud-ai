@@ -10,7 +10,7 @@ from backend.app.user_profile.schema import ProfileUpdateSchema
 
 logger = get_logger()
 
-router = APIRouter(prefix="/profile")
+router = APIRouter(prefix="/profile", tags=["Profile"])
 
 
 @router.patch("/update", response_model=Profile, status_code=status.HTTP_200_OK)

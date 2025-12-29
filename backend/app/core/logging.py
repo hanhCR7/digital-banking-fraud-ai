@@ -6,7 +6,7 @@ from backend.app.core.config import settings
 
 logger.remove()
 
-LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
+LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "log")
 
 LOG_FORMAT = (
     "{time:YYYY-MM-DD HH:mm:ss.SSS} | "
