@@ -204,6 +204,7 @@ async def delete_next_of_kin(
                     "action": "At least one next of kin must be maintained",
                 },
             )
+        # Lấy người thân để xoá, đảm bảo thuộc về user hiện tại
         next_of_kin = await get_user_next_of_kin(user_id, next_of_kin_id, session)
         await session.delete(next_of_kin)
         await session.commit()
