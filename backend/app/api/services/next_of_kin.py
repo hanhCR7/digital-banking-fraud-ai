@@ -163,8 +163,9 @@ async def update_next_of_kin(
                             "message": "Cannot unset primary next of kin when there is only one",
                         },
                     )
+        # Cập nhật các trường thông tin khác
         update_dict = update_data.model_dump(exclude_unset=True)
-
+        # Áp dụng các thay đổi vào entity
         for key, value in update_dict.items():
             setattr(next_of_kin, key, value)
 
