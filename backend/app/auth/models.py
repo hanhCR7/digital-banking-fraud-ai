@@ -9,6 +9,7 @@ from backend.app.auth.schema import BaseUserSchema, RoleChoicesSchema
 if TYPE_CHECKING:
     from backend.app.user_profile.models import Profile
     from backend.app.next_of_kin.models import NextOfKin
+    from backend.app.bank_account.models import BankAccount
 
 class User(BaseUserSchema, table=True):
     __tablename__: ClassVar[str] = "users"
@@ -55,6 +56,12 @@ class User(BaseUserSchema, table=True):
     )
     # Mối quan hệ một-nhiều với NextOfKin
     next_of_kins: list["NextOfKin"] = Relationship(back_populates="user")
+    # Mối quan hệ một-nhiều với BankAccount
+    bank_accounts: list["BankAccount"] = Relationship(back_populates="user")
+
+
+
+    
     @computed_field
     @property
     def full_name(self) -> str:
