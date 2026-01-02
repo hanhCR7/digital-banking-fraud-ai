@@ -71,6 +71,15 @@ class Setting(BaseSettings):
     ALLOWED_MIME_TYPES: list[str] = ["image/jpeg", "image/png", "image/jpg"]
     MAX_FILE_SIZE: int = 5 * 1024 * 1024
     MAX_DIMENSION: int = 4096
+    # CẤU HÌNH NGÂN HÀNG
+    BANK_CODE: str = ""
+    BANK_BRANCH_CODE: str = ""
+    CURRENCY_CODE_USD: str = "01"
+    CURRENCY_CODE_EUR: str = "02"
+    CURRENCY_CODE_GBP: str = "03"
+    CURRENCY_CODE_KES: str = "04"
+    CURRENCY_CODE_VND: str = "05"
+    MAX_BANK_ACCOUNTS: int = 3 # Số tài khoản ngân hàng tối đa cho mỗi người dùng
 settings = Setting()
 # Cấu hình Cloudinary khi khởi động ứng dụng
 cloudinary.config(
