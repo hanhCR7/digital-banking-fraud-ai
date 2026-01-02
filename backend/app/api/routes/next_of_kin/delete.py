@@ -9,7 +9,7 @@ from backend.app.core.db import get_session
 from backend.app.core.logging import get_logger
 
 logger = get_logger()
-router = APIRouter(prefix="/next-of-kin")
+router = APIRouter(prefix="/next-of-kin", tags=["Next of Kin"])
 
 
 @router.delete(

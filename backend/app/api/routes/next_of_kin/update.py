@@ -10,7 +10,7 @@ from backend.app.core.logging import get_logger
 from backend.app.next_of_kin.schema import NextOfKinReadSchema, NextOfKinUpdateSchema
 
 logger = get_logger()
-router = APIRouter(prefix="/next-of-kin")
+router = APIRouter(prefix="/next-of-kin", tags=["Next of Kin"])
 
 
 @router.patch(
