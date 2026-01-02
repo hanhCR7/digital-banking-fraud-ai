@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from backend.app.user_profile.models import Profile
     from backend.app.next_of_kin.models import NextOfKin
     from backend.app.bank_account.models import BankAccount
+    from backend.app.transaction.models import Transaction
 
 class User(BaseUserSchema, table=True):
     __tablename__: ClassVar[str] = "users"
@@ -58,6 +59,21 @@ class User(BaseUserSchema, table=True):
     next_of_kins: list["NextOfKin"] = Relationship(back_populates="user")
     # Mối quan hệ một-nhiều với BankAccount
     bank_accounts: list["BankAccount"] = Relationship(back_populates="user")
+    # Các quan hệ 1-n với Transaction
+    sent_transactions: list["Transaction"] = Relationship(
+        back_populates="sender",
+        sa_relationship_kwargs={"foreign_keys": "Transaction.sender_id"},
+    )  # Giao dịch user gửi
+
+    received_transactions: list["Transaction"] = Relationship(
+        back_populates="receiver",
+        sa_relationship_kwargs={"foreign_keys": "Transaction.receiver_id"},
+    )  # Giao dịch user nhận
+
+    processed_transactions: list["Transaction"] = Relationship(
+        back_populates="processor",
+        sa_relationship_kwargs={"foreign_keys": "Transaction.processed_by"},
+    )  # Giao dịch user xử lý
 
 
 
