@@ -1,3 +1,5 @@
+# Tiện ích sinh số tài khoản và xử lý chuyển đổi tiền tệ
+
 import secrets
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Tuple
@@ -12,11 +14,7 @@ logger = get_logger()
 
 
 def get_currency_code(currency: AccountCurrencyEnum) -> str:
-    """
-    Lấy mã tiền tệ nội bộ của ngân hàng dựa trên loại tiền tệ.
-    Hàm này được sử dụng khi sinh số tài khoản ngân hàng.
-    """
-    # Bản đồ giữa enum tiền tệ và mã tiền tệ được cấu hình trong hệ thống
+    """Lấy mã tiền tệ nội bộ theo loại tiền."""
     currency_codes = {
         AccountCurrencyEnum.USD: settings.CURRENCY_CODE_USD,
         AccountCurrencyEnum.EUR: settings.CURRENCY_CODE_EUR,
@@ -27,7 +25,6 @@ def get_currency_code(currency: AccountCurrencyEnum) -> str:
 
     currency_code = currency_codes.get(currency)
 
-    # Trường hợp tiền tệ không hợp lệ hoặc chưa được cấu hình
     if not currency_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -38,40 +35,29 @@ def get_currency_code(currency: AccountCurrencyEnum) -> str:
 
 
 def split_into_digits(number: str | int) -> list[int]:
-    """
-    Tách một số thành danh sách các chữ số riêng lẻ.
-    Dùng trong thuật toán Luhn để tính check digit.
-    """
+    """Tách số thành các chữ số (phục vụ thuật toán Luhn)."""
     return [int(digit) for digit in str(number)]
 
 
 def calculate_luhn_check_digit(number: str) -> int:
-    """
-    Tính chữ số kiểm tra (check digit) theo thuật toán Luhn.
-    Thuật toán này giúp phát hiện lỗi nhập sai số tài khoản.
-    """
+    """Tính check digit theo thuật toán Luhn."""
     digits = split_into_digits(number)
 
-    # Các chữ số ở vị trí lẻ (tính từ phải sang trái)
     odd_digits = digits[-1::-2]
-
-    # Các chữ số ở vị trí chẵn
     even_digits = digits[-2::-2]
 
     total = sum(odd_digits)
 
-    # Nhân đôi các chữ số chẵn và cộng tổng các chữ số
     for digit in even_digits:
         doubled = digit * 2
         total += sum(split_into_digits(doubled))
 
-    # Tính check digit
     return (10 - (total % 10)) % 10
 
 
 def generate_account_number(currency: AccountCurrencyEnum) -> str:
     """
-    Sinh số tài khoản ngân hàng theo chuẩn nội bộ:
+    Sinh số tài khoản ngân hàng:
     [BANK_CODE][BRANCH_CODE][CURRENCY_CODE][RANDOM][CHECK_DIGIT]
     """
     try:
@@ -79,46 +65,92 @@ def generate_account_number(currency: AccountCurrencyEnum) -> str:
         if not all([settings.BANK_CODE, settings.BANK_BRANCH_CODE]):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={
-                    "status": "error",
-                    "message": "Bank or Branch code not configured",
-                },
+                detail={"status": "error", "message": "Bank or Branch code not configured"},
             )
 
         currency_code = get_currency_code(currency)
 
-        # Prefix cố định của số tài khoản
         prefix = f"{settings.BANK_CODE}{settings.BANK_BRANCH_CODE}{currency_code}"
 
-        # Tổng độ dài số tài khoản là 16 chữ số (bao gồm check digit)
+        # Tổng độ dài số tài khoản = 16
         remaining_digits = 16 - len(prefix) - 1
 
-        # Sinh các chữ số ngẫu nhiên
         random_digits = "".join(
             secrets.choice("0123456789") for _ in range(remaining_digits)
         )
 
         partial_account_number = f"{prefix}{random_digits}"
 
-        # Tính chữ số kiểm tra theo Luhn
         check_digit = calculate_luhn_check_digit(partial_account_number)
 
-        account_number = f"{partial_account_number}{check_digit}"
-
-        return account_number
+        return f"{partial_account_number}{check_digit}"
 
     except HTTPException as http_ex:
         logger.error(f"HTTP Exception in account number generation: {http_ex.detail}")
-        raise http_ex
+        raise
     except Exception as e:
         logger.error(f"Error generating account number: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"status": "error", "message": "Failed to generate account number"},
+        )
+
+
+# Bảng tỷ giá giả lập (không phải realtime)
+EXCHANGE_RATES = {
+    "USD": {"EUR": Decimal("0.93"), "GBP": Decimal("0.79"), "KES": Decimal("163.50"), "VND": Decimal("26077.00")},
+    "EUR": {"USD": Decimal("1.0753"), "GBP": Decimal("0.8495"), "KES": Decimal("175.81"), "VND": Decimal("28040.86")},
+    "GBP": {"USD": Decimal("1.2658"), "EUR": Decimal("1.1772"), "KES": Decimal("206.96"), "VND": Decimal("33072.15")},
+    "KES": {"USD": Decimal("0.0061"), "EUR": Decimal("0.0057"), "GBP": Decimal("0.0048"), "VND": Decimal("159.45")},
+    "VND": {"USD": Decimal("0.00003835"), "EUR": Decimal("0.00003321"), "GBP": Decimal("0.00003030"), "KES": Decimal("0.00627")},
+}
+
+CONVERSION_FEE_RATE = Decimal("0.005")  # Phí chuyển đổi 0.5%
+
+
+def get_exchange_rate(
+    from_currency: AccountCurrencyEnum,
+    to_currency: AccountCurrencyEnum,
+) -> Decimal:
+    """Lấy tỷ giá giữa hai loại tiền."""
+    if from_currency == to_currency:
+        return Decimal("1.0")
+
+    try:
+        # Truy xuất tỷ giá từ bảng giả lập
+        rate = EXCHANGE_RATES[from_currency.value][to_currency.value]
+        return rate.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+    except KeyError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "status": "error",
-                "message": f"Failed to generate account number: {str(e)}",
+                "message": f"Exchange rate not available for {from_currency.value} to {to_currency.value}",
             },
         )
 
 
+def calculate_conversion(
+    amount: Decimal,
+    from_currency: AccountCurrencyEnum,
+    to_currency: AccountCurrencyEnum,
+) -> Tuple[Decimal, Decimal, Decimal]:
+    """Tính số tiền sau khi chuyển đổi (đã trừ phí)."""
 
+    if from_currency == to_currency:
+        return amount, Decimal("1.0"), Decimal("0")
+    # Lấy tỷ giá
+    exchange_rate = get_exchange_rate(from_currency, to_currency)
+    # Tính phí chuyển đổi
+    conversion_fee = (amount * CONVERSION_FEE_RATE).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    # Tính số tiền sau phí
+    amount_after_fee = amount - conversion_fee
+    # Tính số tiền sau chuyển đổi
+    quantize = Decimal("1") if to_currency == AccountCurrencyEnum.VND else Decimal("0.01")
+    converted_amount = (amount_after_fee * exchange_rate).quantize(
+        quantize, rounding=ROUND_HALF_UP
+    )
+
+    return converted_amount, exchange_rate, conversion_fee

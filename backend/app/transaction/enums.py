@@ -1,23 +1,41 @@
 from enum import Enum
 
-
+# Loại giao dịch
 class TransactionTypeEnum(str, Enum):
-    Deposit = "deposit"   # Giao dịch nạp tiền vào tài khoản
-    Withdrawal = "withdrawal" # Giao dịch rút tiền từ tài khoản
-    Transfer = "transfer" # Giao dịch chuyển tiền giữa các tài khoản
-    Reversal = "reversal" # Giao dịch hoàn tác (đảo ngược) một giao dịch trước đó
-    Fee_Charged = "fee_charged" # Giao dịch trừ phí dịch vụ (phí chuyển tiền, phí duy trì tài khoản...)
-    Loan_Disbursement = "loan_disbursement" # Giao dịch giải ngân khoản vay vào tài khoản
-    Loan_Repayment = "loan_repayment"  # Giao dịch trả nợ khoản vay (gốc và/hoặc lãi)
-    Interest_Credited = "interest_credited" # Giao dịch cộng tiền lãi (tiết kiệm, tiền gửi có kỳ hạn)
+    Deposit = "deposit"                 # Nạp tiền
+    Withdrawal = "withdrawal"           # Rút tiền
+    Transfer = "transfer"               # Chuyển tiền
+    Reversal = "reversal"               # Hoàn tác giao dịch
+    Fee_Charged = "fee_charged"         # Trừ phí
+    Loan_Disbursement = "loan_disbursement"  # Giải ngân vay
+    Loan_Repayment = "loan_repayment"   # Trả nợ vay
+    Interest_Credited = "interest_credited"  # Cộng lãi
 
+
+# Trạng thái giao dịch
 class TransactionStatusEnum(str, Enum):
-    Pending = "pending"  # Giao dịch đang chờ xử lý (chưa hoàn tất)
-    Completed = "completed" # Giao dịch đã được xử lý thành công
-    Failed = "failed" # Giao dịch thất bại do lỗi hệ thống hoặc nghiệp vụ
-    Reversed = "reversed" # Giao dịch đã hoàn tất nhưng bị hoàn tác (rollback nghiệp vụ)
-    Cancelled = "cancelled" # Giao dịch bị hủy trước khi hoàn tất
+    Pending = "pending"                 # Đang xử lý
+    Completed = "completed"             # Hoàn tất
+    Failed = "failed"                   # Thất bại
+    Reversed = "reversed"               # Đã hoàn tác
+    Cancelled = "cancelled"             # Đã hủy
 
+
+# Phân loại theo chiều biến động số dư
 class TransactionCategoryEnum(str, Enum):
-    Credit = "credit" # Giao dịch làm TĂNG số dư tài khoản (nạp tiền, nhận tiền, lãi)
-    Debit = "debit" # Giao dịch làm GIẢM số dư tài khoản (rút tiền, chuyển tiền, trả phí)
+    Credit = "credit"                   # Tăng số dư
+    Debit = "debit"                     # Giảm số dư
+
+
+# Nguyên nhân giao dịch thất bại
+class TransactionFailureReason(str, Enum):
+    INSUFFICIENT_BALANCE = "insufficient_balance"      # Không đủ số dư
+    INVALID_OTP = "invalid_otp"                          # OTP sai
+    OTP_EXPIRED = "otp_expired"                          # OTP hết hạn
+    CURRENCY_CONVERSION_FAILED = "currency_conversion_failed"  # Lỗi đổi tiền
+    ACCOUNT_INACTIVE = "account_inactive"                # Tài khoản không hoạt động
+    SYSTEM_ERROR = "system_error"                        # Lỗi hệ thống
+    INVALID_AMOUNT = "invalid_amount"                    # Số tiền không hợp lệ
+    INVALID_ACCOUNT = "invalid_account"                  # Tài khoản không hợp lệ
+    SELF_TRANSFER = "self_transfer"                      # Chuyển cho chính mình
+    SUSPICIOUS_ACTIVITY = "suspicious_activity"          # Hoạt động đáng ngờ

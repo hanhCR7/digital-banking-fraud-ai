@@ -75,3 +75,21 @@ class Transaction(TransactionBaseSchema, table=True):
         back_populates="processed_transactions",
         sa_relationship_kwargs={"foreign_keys": "Transaction.processed_by"},
     )  # User xử lý
+class IdempotencyKey(SQLModel, table=True):
+    """Model lưu idempotency key cho các request quan trọng."""
+    id: uuid.UUID = Field(
+        sa_column=Column(pg.UUID(as_uuid=True), primary_key=True),
+        default_factory=uuid.uuid4,
+    )  # ID bản ghi
+    key: str = Field(index=True, unique=True)  # Idempotency key (duy nhất)
+    user_id: uuid.UUID = Field(foreign_key="users.id")  # Người gửi request
+    endpoint: str  # Endpoint áp dụng key
+    response_code: int  # HTTP status đã trả
+    response_body: dict = Field(sa_column=Column(JSONB))  # Response cache
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(pg.TIMESTAMP(timezone=True), nullable=False),
+    )  # Thời điểm tạo
+    expires_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP(timezone=True), nullable=False),
+    )  # Thời điểm hết hạn
