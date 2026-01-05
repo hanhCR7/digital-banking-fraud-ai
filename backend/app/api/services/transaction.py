@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from fastapi import HTTPException, status
-from sqlmodel import select
+from sqlmodel import any_, desc, func, or_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from backend.app.auth.models import User
@@ -570,4 +570,111 @@ async def process_withdrawal(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"status": "error", "message": "Failed to process withdrawal"},
+        )
+
+async def get_user_transactions(
+    user_id: uuid.UUID,
+    session: AsyncSession,
+    skip: int = 0,
+    limit: int = 20,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    transaction_type: TransactionTypeEnum | None = None,
+    transaction_category: TransactionCategoryEnum | None = None,
+    transaction_status: TransactionStatusEnum | None = None,
+    min_amount: Decimal | None = None,
+    max_amount: Decimal | None = None,
+) -> tuple[list[Transaction], int]:
+    """Lấy lịch sử giao dịch của người dùng (có phân trang & filter)."""
+    try:
+        # Lấy danh sách tài khoản của user
+        account_stmt = select(BankAccount.id).where(BankAccount.user_id == user_id)
+        result = await session.exec(account_stmt)
+        account_ids = [account_id for account_id in result.all()]
+
+        if not account_ids:
+            return [], 0
+
+        # Query giao dịch liên quan đến user hoặc các tài khoản của user
+        base_query = select(Transaction).where(
+            or_(
+                Transaction.sender_id == user_id,
+                Transaction.receiver_id == user_id,
+                Transaction.sender_account_id == any_(account_ids),
+                Transaction.receiver_account_id == any_(account_ids),
+            )
+        )
+
+        # Áp dụng các điều kiện filter
+        if start_date:
+            base_query = base_query.where(Transaction.created_at >= start_date)
+        if end_date:
+            base_query = base_query.where(Transaction.created_at <= end_date)
+        if transaction_type:
+            base_query = base_query.where(
+                Transaction.transaction_type == transaction_type
+            )
+        if transaction_category:
+            base_query = base_query.where(
+                Transaction.transaction_category == transaction_category
+            )
+        if transaction_status:
+            base_query = base_query.where(Transaction.status == transaction_status)
+        if min_amount is not None:
+            base_query = base_query.where(Transaction.amount >= min_amount)
+        if max_amount is not None:
+            base_query = base_query.where(Transaction.amount <= max_amount)
+
+        # Sắp xếp theo thời gian mới nhất
+        base_query = base_query.order_by(desc(Transaction.created_at))
+
+        # Đếm tổng số giao dịch
+        count_query = select(func.count()).select_from(base_query.subquery())
+        total = await session.exec(count_query)
+        total_count = total.first() or 0
+
+        # Lấy danh sách giao dịch theo phân trang
+        transactions = await session.exec(base_query.offset(skip).limit(limit))
+        transaction_list = list(transactions.all())
+
+        # Load quan hệ & gắn thông tin đối tác giao dịch
+        for transaction in transaction_list:
+            await session.refresh(
+                transaction,
+                ["sender", "receiver", "sender_account", "receiver_account"],
+            )
+
+            transaction.transaction_metadata = transaction.transaction_metadata or {}
+
+            # Xác định đối tác giao dịch
+            if transaction.sender_id == user_id:
+                if transaction.receiver:
+                    transaction.transaction_metadata["counterparty_name"] = (
+                        transaction.receiver.full_name
+                    )
+                if transaction.receiver_account:
+                    transaction.transaction_metadata["counterparty_account"] = (
+                        transaction.receiver_account.account_number
+                    )
+            else:
+                if transaction.sender:
+                    transaction.transaction_metadata["counterparty_name"] = (
+                        transaction.sender.full_name
+                    )
+                if transaction.sender_account:
+                    transaction.transaction_metadata["counterparty_account"] = (
+                        transaction.sender_account.account_number
+                    )
+
+        return transaction_list, total_count
+
+    except Exception as e:
+        logger.error(f"Error fetching user transactions: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "status": "error",
+                "message": "Failed to fetch transaction history",
+                "action": "Please try again later",
+            },
         )

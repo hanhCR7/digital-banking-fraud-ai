@@ -87,3 +87,67 @@ class WithdrawalRequestSchema(SQLModel):
     amount: Decimal = Field(ge=0, decimal_places=2)          # Số tiền rút
     username: str = Field(min_length=1, max_length=12)        # Tên đăng nhập người rút
     description: str = Field(max_length=250)                    # Nội dung giao dịch
+
+class TransactionHistoryResponseSchema(SQLModel):
+    """Schema hiển thị lịch sử giao dịch."""
+
+    id: uuid.UUID                     # ID giao dịch
+    reference: str                    # Mã giao dịch
+    amount: Decimal                   # Số tiền giao dịch
+    description: str                  # Nội dung giao dịch
+    transaction_type: TransactionTypeEnum      # Loại giao dịch
+    transaction_category: TransactionCategoryEnum  # Credit / Debit
+    transaction_status: TransactionStatusEnum  # Trạng thái giao dịch
+    created_at: datetime              # Thời điểm tạo
+    completed_at: datetime | None = None  # Thời điểm hoàn tất
+    balance_after: Decimal            # Số dư sau giao dịch
+
+    currency: str | None = None       # Tiền tệ giao dịch
+    converted_amount: str | None = None  # Số tiền sau quy đổi (nếu có)
+    from_currency: str | None = None  # Tiền tệ nguồn
+    to_currency: str | None = None    # Tiền tệ đích
+    counterparty_name: str | None = None     # Tên đối tác
+    counterparty_account: str | None = None  # Tài khoản đối tác
+
+
+class PaginatedTransactionResponseSchema(SQLModel):
+    """Schema phân trang lịch sử giao dịch."""
+
+    total: int                        # Tổng số giao dịch
+    skip: int                         # Offset
+    limit: int                        # Số bản ghi mỗi trang
+    transactions: list[TransactionHistoryResponseSchema]  # Danh sách giao dịch
+
+
+class TransactionFilterParamsSchema(SQLModel):
+    """Schema filter lịch sử giao dịch."""
+
+    start_date: datetime | None = Query(
+        default=None,
+        description="Lọc giao dịch từ ngày này (bao gồm)",
+        example="2025-01-01T00:00:00Z",
+    )
+    end_date: datetime | None = Query(
+        default=None,
+        description="Lọc giao dịch đến ngày này (bao gồm)",
+        example="2025-12-01T23:59:59Z",
+    )
+    transaction_type: TransactionTypeEnum | None = Query(
+        default=None, description="Lọc theo loại giao dịch"
+    )
+    transaction_category: TransactionCategoryEnum | None = Query(
+        default=None, description="Lọc theo Credit / Debit"
+    )
+    status: TransactionStatusEnum | None = Query(
+        default=None, description="Lọc theo trạng thái giao dịch"
+    )
+    min_amount: Decimal | None = Query(
+        default=None,
+        ge=0,
+        description="Lọc giao dịch có số tiền >= giá trị này",
+    )
+    max_amount: Decimal | None = Query(
+        default=None,
+        ge=0,
+        description="Lọc giao dịch có số tiền <= giá trị này",
+    )
