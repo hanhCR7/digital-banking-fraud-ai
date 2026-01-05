@@ -23,7 +23,7 @@ from backend.app.transaction.schema import (
 logger = get_logger()
 
 # Router xử lý các API liên quan đến chuyển tiền giữa các tài khoản ngân hàng
-router = APIRouter(prefix="/bank-account", tags=["Transactions"])
+router = APIRouter(prefix="/bank-account", tags=["Bank Account"])
 
 
 def validate_uuid4(value: str) -> str:

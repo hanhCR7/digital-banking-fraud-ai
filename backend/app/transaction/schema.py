@@ -82,3 +82,8 @@ class CurrencyConversionSchema(SQLModel):
         default=Decimal("0.00")
     )                                   # Phí chuyển đổi
 
+class WithdrawalRequestSchema(SQLModel):
+    account_number: str = Field(min_length=16, max_length=16) # Số tài khoản rút tiền
+    amount: Decimal = Field(ge=0, decimal_places=2)          # Số tiền rút
+    username: str = Field(min_length=1, max_length=12)        # Tên đăng nhập người rút
+    description: str = Field(max_length=250)                    # Nội dung giao dịch

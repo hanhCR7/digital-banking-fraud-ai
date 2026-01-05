@@ -475,3 +475,99 @@ async def complete_transfer(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"status": "error", "message": "Failed to complete the transfer"},
         )
+async def process_withdrawal(
+    *,
+    account_number: str,
+    amount: Decimal,
+    username: str,
+    description: str,
+    session: AsyncSession,
+) -> tuple[Transaction, BankAccount, User]:
+    """Xử lý nghiệp vụ rút tiền từ tài khoản."""
+    try:
+        # Lấy tài khoản và user theo số tài khoản + username
+        statement = (
+            select(BankAccount, User)
+            .join(User)
+            .where(
+                BankAccount.account_number == account_number,
+                User.username == username,
+            )
+        )
+        result = await session.exec(statement)
+        account_user = result.first()
+
+        if not account_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"status": "error", "message": "Account or username not found"},
+            )
+
+        account, user = account_user
+
+        # Kiểm tra tài khoản hoạt động
+        if account.account_status != AccountStatusEnum.Active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"status": "error", "message": "Account is not active"},
+            )
+
+        # Kiểm tra đủ số dư
+        if Decimal(str(account.balance)) < amount:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"status": "error", "message": "Insufficient balance"},
+            )
+
+        # Sinh mã tham chiếu giao dịch
+        reference = f"WTH{uuid.uuid4().hex[:8].upper()}"
+
+        # Tính số dư trước / sau
+        balance_before = Decimal(str(account.balance))
+        balance_after = balance_before - amount
+
+        # Tạo giao dịch rút tiền
+        transaction = Transaction(
+            amount=amount,
+            description=description,
+            reference=reference,
+            transaction_type=TransactionTypeEnum.Withdrawal,
+            transaction_category=TransactionCategoryEnum.Debit,
+            status=TransactionStatusEnum.Completed,
+            balance_before=balance_before,
+            balance_after=balance_after,
+            sender_account_id=account.id,
+            sender_id=user.id,
+            completed_at=datetime.now(timezone.utc),
+            transaction_metadata={
+                "currency": account.currency.value,
+                "account_number": account.account_number,
+                "withdrawal_method": "cash",
+            },
+        )
+
+        session.add(transaction)
+        await session.commit()
+        await session.refresh(transaction)
+        # Hoàn tất giao dịch và cập nhật số dư
+        transaction.status = TransactionStatusEnum.Completed
+        transaction.completed_at = datetime.now(timezone.utc)
+
+        account.balance = float(balance_after)
+
+        session.add(account)
+        await session.commit()
+        await session.refresh(account)
+
+        return transaction, account, user
+
+    except HTTPException:
+        await session.rollback()
+        raise
+    except Exception as e:
+        await session.rollback()
+        logger.error(f"Failed to process withdrawal: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"status": "error", "message": "Failed to process withdrawal"},
+        )
