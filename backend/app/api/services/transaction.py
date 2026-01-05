@@ -1,3 +1,4 @@
+from typing import Any
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -10,6 +11,7 @@ from backend.app.auth.utils import generate_otp
 from backend.app.bank_account.enums import AccountStatusEnum
 from backend.app.bank_account.models import BankAccount
 from backend.app.bank_account.utils import calculate_conversion
+from backend.app.core.tasks.statement import generate_statement_pdf
 from backend.app.transaction.utils import mark_transaction_failed
 from backend.app.core.config import settings
 from backend.app.core.logging import get_logger
@@ -678,3 +680,215 @@ async def get_user_transactions(
                 "action": "Please try again later",
             },
         )
+async def get_user_statement_data(
+    user_id: uuid.UUID,
+    start_date: datetime,
+    end_date: datetime,
+    session: AsyncSession,
+) -> tuple[dict[str, Any], list[Transaction]]:
+    """Lấy dữ liệu người dùng và giao dịch để tạo sao kê."""
+    try:
+        # Lấy thông tin user
+        user_stmt = select(User).where(User.id == user_id)
+        result = await session.exec(user_stmt)
+        user = result.first()
+
+        if not user:
+            raise ValueError(f"User {user_id} not found")
+
+        # Chuẩn hóa họ tên hiển thị
+        full_name = (
+            f"{user.first_name} "
+            f"{user.middle_name + ' ' if user.middle_name else ''}"
+            f"{user.last_name}"
+        ).title().strip()
+
+        user_info = {
+            "username": user.username,
+            "email": user.email,
+            "full_name": full_name,
+        }
+
+        # Lấy danh sách giao dịch trong khoảng thời gian
+        txn_stmt = (
+            select(Transaction)
+            .where(
+                (Transaction.sender_id == user_id)
+                | (Transaction.receiver_id == user_id),
+                Transaction.created_at >= start_date,
+                Transaction.created_at <= end_date,
+            )
+            .order_by(desc(Transaction.created_at))
+        )
+
+        txn_result = await session.exec(txn_stmt)
+        transactions = txn_result.all()
+
+        return user_info, list(transactions)
+
+    except Exception as e:
+        logger.error(f"Failed to get statement data for user {user_id}: {e}")
+        raise
+async def prepare_statement_data(
+    user_id: uuid.UUID,
+    start_date: datetime,
+    end_date: datetime,
+    session: AsyncSession,
+    account_number: str | None = None,
+) -> dict:
+    """Chuẩn bị dữ liệu user, tài khoản và giao dịch để tạo sao kê."""
+    try:
+        # Lấy thông tin user
+        user_query = select(User).where(User.id == user_id)
+        result = await session.exec(user_query)
+        user = result.first()
+        if not user:
+            raise ValueError(f"User {user_id} not found")
+
+        # Xác định danh sách tài khoản (1 tài khoản hoặc tất cả)
+        if account_number:
+            account_query = select(BankAccount).where(
+                BankAccount.account_number == account_number,
+                BankAccount.user_id == user_id,
+            )
+            account_result = await session.exec(account_query)
+            account = account_result.first()
+
+            if not account:
+                raise ValueError("Account not found or does not belong to user")
+
+            accounts = [account]
+        else:
+            accounts_query = select(BankAccount).where(BankAccount.user_id == user_id)
+            accounts_result = await session.exec(accounts_query)
+            accounts = accounts_result.all()
+
+        # Chuẩn hóa thông tin tài khoản
+        account_details = []
+        for acc in accounts:
+            if acc.account_number:
+                account_details.append(
+                    {
+                        "account_number": acc.account_number,
+                        "account_name": acc.account_name,
+                        "account_type": acc.account_type.value,
+                        "currency": acc.currency.value,
+                        "balance": str(acc.balance),
+                    }
+                )
+
+        account_ids = [acc.id for acc in accounts]
+
+        # Lấy giao dịch đã hoàn tất trong khoảng thời gian
+        transactions_query = (
+            select(Transaction)
+            .where(
+                or_(
+                    Transaction.sender_account_id == any_(account_ids),
+                    Transaction.receiver_account_id == any_(account_ids),
+                ),
+                Transaction.created_at >= start_date,
+                Transaction.created_at <= end_date,
+                Transaction.status == TransactionStatusEnum.Completed,
+            )
+            .order_by(desc(Transaction.created_at))
+        )
+
+        result = await session.exec(transactions_query)
+        transactions = result.all()
+
+        # Dữ liệu user cho sao kê
+        user_data = {
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "full_name": f"{user.first_name} {user.middle_name + ' ' if user.middle_name else ''}{user.last_name}".strip(),
+            "accounts": account_details,
+        }
+
+        # Chuẩn hóa dữ liệu giao dịch
+        transaction_data = []
+        for txn in transactions:
+            sender_account = (
+                await session.get(BankAccount, txn.sender_account_id)
+                if txn.sender_account_id
+                else None
+            )
+            receiver_account = (
+                await session.get(BankAccount, txn.receiver_account_id)
+                if txn.receiver_account_id
+                else None
+            )
+
+            transaction_data.append(
+                {
+                    "reference": txn.reference,
+                    "amount": str(txn.amount),
+                    "description": txn.description,
+                    "created_at": txn.created_at.strftime("%Y-%m-%d"),
+                    "transaction_type": txn.transaction_type.value,
+                    "transaction_category": txn.transaction_category.value,
+                    "balance_after": str(txn.balance_after),
+                    "sender_account": sender_account.account_number if sender_account else None,
+                    "receiver_account": receiver_account.account_number if receiver_account else None,
+                    "metadata": txn.transaction_metadata,
+                }
+            )
+
+        # Trả dữ liệu tổng hợp cho task tạo sao kê
+        return {
+            "user": user_data,
+            "transactions": transaction_data,
+            "start_date": start_date.strftime("%Y-%m-%d"),
+            "end_date": end_date.strftime("%Y-%m-%d"),
+            "is_single_account": bool(account_number),
+        }
+
+    except ValueError as e:
+        logger.error(f"Error preparing statement data: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Error Preparing statement data: {e}")
+        raise
+async def generate_user_statement(
+    user_id: uuid.UUID,
+    start_date: datetime,
+    end_date: datetime,
+    session: AsyncSession,
+    account_number: str | None = None,
+) -> dict:
+    """Khởi tạo quy trình tạo sao kê cho người dùng."""
+    try:
+        # Chuẩn bị dữ liệu sao kê
+        statement_data = await prepare_statement_data(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+            session=session,
+            account_number=account_number,
+        )
+
+        # Sinh ID sao kê
+        statement_id = str(uuid.uuid4())
+
+        # Gửi task tạo PDF chạy nền
+        task = generate_statement_pdf.delay(
+            statement_data=statement_data, statement_id=statement_id
+        )
+
+        return {
+            "status": "pending",
+            "message": "Statement generation initiated",
+            "statement_id": statement_id,
+            "task_id": task.id,
+        }
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"status": "error", "message": str(e)},
+        )
+    except Exception as e:
+        logger.error(f"Failed to initiate statement generation: {e}")
+        raise

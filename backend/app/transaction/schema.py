@@ -151,3 +151,25 @@ class TransactionFilterParamsSchema(SQLModel):
         ge=0,
         description="Lọc giao dịch có số tiền <= giá trị này",
     )
+class StatementRequestSchema(SQLModel):
+    """Schema yêu cầu sao kê tài khoản."""
+
+    start_date: datetime               # Ngày bắt đầu sao kê
+    end_date: datetime                 # Ngày kết thúc sao kê
+    account_number: str | None = Field(
+        default=None,
+        min_length=16,
+        max_length=16,
+        description="16-digit account number for specific account statements",
+    )                                  # Số tài khoản (tùy chọn)
+
+
+class StatementResponseSchema(SQLModel):
+    """Schema phản hồi yêu cầu sao kê."""
+
+    status: str                        # Trạng thái xử lý
+    message: str                       # Thông báo
+    task_id: str | None = None         # ID task xử lý nền (nếu có)
+    statement_id: str | None = None    # ID sao kê
+    generated_at: datetime | None = None  # Thời điểm tạo sao kê
+    expires_at: datetime | None = None    # Thời điểm hết hạn sao kê
