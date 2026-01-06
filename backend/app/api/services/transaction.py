@@ -12,6 +12,7 @@ from backend.app.bank_account.enums import AccountStatusEnum
 from backend.app.bank_account.models import BankAccount
 from backend.app.bank_account.utils import calculate_conversion
 from backend.app.core.tasks.statement import generate_statement_pdf
+from backend.app.core.utils.number_format import format_currency
 from backend.app.transaction.utils import mark_transaction_failed
 from backend.app.core.config import settings
 from backend.app.core.logging import get_logger
@@ -736,16 +737,25 @@ async def prepare_statement_data(
     session: AsyncSession,
     account_number: str | None = None,
 ) -> dict:
-    """Chuẩn bị dữ liệu user, tài khoản và giao dịch để tạo sao kê."""
+    """
+    Chuẩn bị dữ liệu user, tài khoản và giao dịch để tạo sao kê.
+    """
     try:
-        # Lấy thông tin user
+        # 1. Lấy thông tin user
         user_query = select(User).where(User.id == user_id)
         result = await session.exec(user_query)
         user = result.first()
+
         if not user:
             raise ValueError(f"User {user_id} not found")
 
-        # Xác định danh sách tài khoản (1 tài khoản hoặc tất cả)
+        full_name = (
+            f"{user.first_name} "
+            f"{user.middle_name + ' ' if user.middle_name else ''}"
+            f"{user.last_name}"
+        ).strip()
+
+        # 2. Xác định danh sách tài khoản
         if account_number:
             account_query = select(BankAccount).where(
                 BankAccount.account_number == account_number,
@@ -763,23 +773,31 @@ async def prepare_statement_data(
             accounts_result = await session.exec(accounts_query)
             accounts = accounts_result.all()
 
-        # Chuẩn hóa thông tin tài khoản
+        if not accounts:
+            raise ValueError("User has no bank accounts")
+
+        # 3. Chuẩn hóa thông tin tài khoản (FORMAT TIỀN)
         account_details = []
         for acc in accounts:
-            if acc.account_number:
-                account_details.append(
-                    {
-                        "account_number": acc.account_number,
-                        "account_name": acc.account_name,
-                        "account_type": acc.account_type.value,
-                        "currency": acc.currency.value,
-                        "balance": str(acc.balance),
-                    }
-                )
+            if not acc.account_number:
+                continue
+
+            account_details.append(
+                {
+                    "account_number": acc.account_number,
+                    "account_name": acc.account_name,
+                    "account_type": acc.account_type.value,
+                    "currency": acc.currency.value,
+                    "balance": format_currency(
+                        acc.balance,
+                        acc.currency.value,
+                    ),
+                }
+            )
 
         account_ids = [acc.id for acc in accounts]
 
-        # Lấy giao dịch đã hoàn tất trong khoảng thời gian
+        # 4. Lấy giao dịch đã hoàn tất
         transactions_query = (
             select(Transaction)
             .where(
@@ -797,18 +815,9 @@ async def prepare_statement_data(
         result = await session.exec(transactions_query)
         transactions = result.all()
 
-        # Dữ liệu user cho sao kê
-        user_data = {
-            "username": user.username,
-            "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "full_name": f"{user.first_name} {user.middle_name + ' ' if user.middle_name else ''}{user.last_name}".strip(),
-            "accounts": account_details,
-        }
+        # 5. Chuẩn hóa dữ liệu giao dịch (FORMAT TIỀN)
+        transaction_data: list[dict] = []
 
-        # Chuẩn hóa dữ liệu giao dịch
-        transaction_data = []
         for txn in transactions:
             sender_account = (
                 await session.get(BankAccount, txn.sender_account_id)
@@ -821,27 +830,49 @@ async def prepare_statement_data(
                 else None
             )
 
+            # Xác định loại tiền hiển thị
+            currency = (
+                sender_account.currency.value
+                if sender_account
+                else receiver_account.currency.value
+                if receiver_account
+                else "USD"
+            )
+
             transaction_data.append(
                 {
                     "reference": txn.reference,
-                    "amount": str(txn.amount),
+                    "date": txn.created_at.strftime("%Y-%m-%d"),
                     "description": txn.description,
-                    "created_at": txn.created_at.strftime("%Y-%m-%d"),
                     "transaction_type": txn.transaction_type.value,
                     "transaction_category": txn.transaction_category.value,
-                    "balance_after": str(txn.balance_after),
-                    "sender_account": sender_account.account_number if sender_account else None,
-                    "receiver_account": receiver_account.account_number if receiver_account else None,
-                    "metadata": txn.transaction_metadata,
+                    "amount": format_currency(txn.amount, currency),
+                    "balance_after": format_currency(
+                        txn.balance_after, currency
+                    ),
+                    "sender_account": (
+                        sender_account.account_number if sender_account else None
+                    ),
+                    "receiver_account": (
+                        receiver_account.account_number if receiver_account else None
+                    ),
+                    "metadata": txn.transaction_metadata or {},
                 }
             )
 
-        # Trả dữ liệu tổng hợp cho task tạo sao kê
+        # 6. Dữ liệu tổng hợp cho PDF
         return {
-            "user": user_data,
+            "user": {
+                "username": user.username,
+                "email": user.email,
+                "full_name": full_name,
+            },
+            "accounts": account_details,
             "transactions": transaction_data,
-            "start_date": start_date.strftime("%Y-%m-%d"),
-            "end_date": end_date.strftime("%Y-%m-%d"),
+            "period": {
+                "start_date": start_date.strftime("%Y-%m-%d"),
+                "end_date": end_date.strftime("%Y-%m-%d"),
+            },
             "is_single_account": bool(account_number),
         }
 
@@ -849,7 +880,7 @@ async def prepare_statement_data(
         logger.error(f"Error preparing statement data: {e}")
         raise
     except Exception as e:
-        logger.error(f"Error Preparing statement data: {e}")
+        logger.error(f"Error preparing statement data: {e}")
         raise
 async def generate_user_statement(
     user_id: uuid.UUID,
