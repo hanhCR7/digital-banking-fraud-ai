@@ -176,6 +176,17 @@ class StatementResponseSchema(SQLModel):
     statement_id: str | None = None    # ID sao kê
     generated_at: datetime | None = None  # Thời điểm tạo sao kê
     expires_at: datetime | None = None    # Thời điểm hết hạn sao kê
+class TransactionReviewSchema(SQLModel):
+    """Schema dùng để review thủ công giao dịch bị AI đánh dấu."""
+
+    # Xác nhận giao dịch có gian lận hay không
+    is_fraud: bool
+
+    # Ghi chú của người review (không bắt buộc)
+    notes: str | None = None
+
+    # Quyết định phê duyệt giao dịch
+    approve_transaction: bool = False
 
 class RiskHistoryParams(SQLModel):
     """Tham số lọc và phân trang lịch sử đánh giá rủi ro."""

@@ -23,6 +23,11 @@ from backend.app.transaction.enums import (
     TransactionTypeEnum,
 )
 from backend.app.transaction.models import Transaction
+from backend.app.core.ai.enums import AIReviewStatusEnum
+from backend.app.core.ai.models import TransactionRiskScore
+from backend.app.core.ai.service import TransactionAIService
+from backend.app.core.services.transfer_alert import send_transfer_alert
+from backend.app.core.services.withdrawal_alert import send_withdrawal_alert
 
 
 logger = get_logger()
@@ -230,6 +235,30 @@ async def initiate_transfer(
                 "to_currency": receiver_account.currency.value,
             },
         )
+        session.add(transaction)
+        await session.commit()
+        await session.refresh(transaction)
+        # Phân tích rủi ro giao dịch bằng AI
+        ai_service = TransactionAIService(session)
+        risk_analysis = await ai_service.analyze_transaction(transaction, sender_id)
+        # Nếu giao dịch bị AI đánh dấu rủi ro
+        if risk_analysis.get("needs_review", False):
+            await ai_service.handle_flagged_transaction(transaction, risk_analysis)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "status": "error",
+                    "message": "This transaction has been "
+                    "flagged as potentially fraudulent. An "
+                    "account executive will review the "
+                    "transaction, before its either "
+                    "approved or rejected",
+                    "risk_analysis": {
+                        "risk_score": risk_analysis["risk_score"],
+                        "risk_factors": risk_analysis["risk_factors"],
+                    },
+                },
+            )
         # Sinh OTP xác nhận giao dịch
         otp = generate_otp()
         sender.otp = otp
@@ -486,10 +515,21 @@ async def process_withdrawal(
     description: str,
     session: AsyncSession,
 ) -> tuple[Transaction, BankAccount, User]:
-    """Xử lý nghiệp vụ rút tiền từ tài khoản."""
+    """
+    Xử lý nghiệp vụ rút tiền từ tài khoản.
+
+    Flow:
+    1. Xác thực tài khoản & người dùng
+    2. Kiểm tra trạng thái tài khoản
+    3. Kiểm tra số dư
+    4. Tạo transaction Pending
+    5. Phân tích rủi ro bằng AI
+    6. Nếu an toàn → trừ tiền & hoàn tất giao dịch
+    7. Commit & refresh dữ liệu
+    """
     try:
-        # Lấy tài khoản và user theo số tài khoản + username
-        statement = (
+        # 1. Lấy tài khoản và user theo account_number + username
+        stmt = (
             select(BankAccount, User)
             .join(User)
             .where(
@@ -497,7 +537,7 @@ async def process_withdrawal(
                 User.username == username,
             )
         )
-        result = await session.exec(statement)
+        result = await session.exec(stmt)
         account_user = result.first()
 
         if not account_user:
@@ -508,40 +548,37 @@ async def process_withdrawal(
 
         account, user = account_user
 
-        # Kiểm tra tài khoản hoạt động
+        # 2. Kiểm tra trạng thái tài khoản
         if account.account_status != AccountStatusEnum.Active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={"status": "error", "message": "Account is not active"},
             )
 
-        # Kiểm tra đủ số dư
-        if Decimal(str(account.balance)) < amount:
+        # 3. Kiểm tra số dư
+        balance_before = Decimal(str(account.balance))
+        if balance_before < amount:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={"status": "error", "message": "Insufficient balance"},
             )
 
-        # Sinh mã tham chiếu giao dịch
-        reference = f"WTH{uuid.uuid4().hex[:8].upper()}"
-
-        # Tính số dư trước / sau
-        balance_before = Decimal(str(account.balance))
         balance_after = balance_before - amount
 
-        # Tạo giao dịch rút tiền
+        # 4. Tạo giao dịch Pending
+        reference = f"WTH{uuid.uuid4().hex[:8].upper()}"
+
         transaction = Transaction(
             amount=amount,
             description=description,
             reference=reference,
             transaction_type=TransactionTypeEnum.Withdrawal,
             transaction_category=TransactionCategoryEnum.Debit,
-            status=TransactionStatusEnum.Completed,
+            status=TransactionStatusEnum.Pending,
             balance_before=balance_before,
             balance_after=balance_after,
             sender_account_id=account.id,
             sender_id=user.id,
-            completed_at=datetime.now(timezone.utc),
             transaction_metadata={
                 "currency": account.currency.value,
                 "account_number": account.account_number,
@@ -550,23 +587,49 @@ async def process_withdrawal(
         )
 
         session.add(transaction)
-        await session.commit()
-        await session.refresh(transaction)
-        # Hoàn tất giao dịch và cập nhật số dư
+        await session.flush()  # Chưa commit, chỉ lấy ID
+
+        # 5. Phân tích rủi ro bằng AI
+        ai_service = TransactionAIService(session)
+        risk_analysis = await ai_service.analyze_transaction(transaction, user.id)
+
+        if risk_analysis.get("needs_review", False):
+            await ai_service.handle_flagged_transaction(transaction, risk_analysis)
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "status": "error",
+                    "message": "This transaction has been flagged as potentially fraudulent "
+                               "and is pending manual review",
+                    "risk_analysis": {
+                        "risk_score": risk_analysis["risk_score"],
+                        "risk_factors": risk_analysis["risk_factors"],
+                    },
+                },
+            )
+
+        # 6. Trừ tiền & hoàn tất giao dịch
+        account.balance = float(balance_after)
         transaction.status = TransactionStatusEnum.Completed
         transaction.completed_at = datetime.now(timezone.utc)
 
-        account.balance = float(balance_after)
-
         session.add(account)
+        session.add(transaction)
+
+        # 7. Commit & refresh
         await session.commit()
+        await session.refresh(transaction)
         await session.refresh(account)
 
         return transaction, account, user
 
+    # Xử lý lỗi nghiệp vụ
     except HTTPException:
         await session.rollback()
         raise
+
+    # Xử lý lỗi hệ thống
     except Exception as e:
         await session.rollback()
         logger.error(f"Failed to process withdrawal: {e}")
@@ -574,6 +637,7 @@ async def process_withdrawal(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"status": "error", "message": "Failed to process withdrawal"},
         )
+
 
 async def get_user_transactions(
     user_id: uuid.UUID,
@@ -923,3 +987,444 @@ async def generate_user_statement(
     except Exception as e:
         logger.error(f"Failed to initiate statement generation: {e}")
         raise
+async def review_flagged_transaction(
+    transaction_id: uuid.UUID,
+    reviewer_id: uuid.UUID,
+    is_fraud: bool,
+    approve_transaction: bool,
+    notes: str | None,
+    session: AsyncSession,
+) -> dict:
+    """
+    Duyệt thủ công giao dịch bị AI đánh dấu nghi ngờ gian lận.
+
+    Flow nghiệp vụ:
+    1. Lấy giao dịch + risk score
+    2. Kiểm tra giao dịch có đang ở trạng thái FLAGGED không
+    3. Reviewer xác nhận fraud hoặc không
+    4. Nếu được approve → hoàn tất giao dịch
+    5. Ghi metadata lịch sử duyệt
+    6. Commit kết quả
+    """
+    try:
+        # 1. Lấy giao dịch và thông tin risk score liên quan
+        query = (
+            select(Transaction, TransactionRiskScore)
+            .join(TransactionRiskScore)
+            .where(Transaction.id == transaction_id)
+        )
+
+        result = await session.exec(query)
+        transaction_data = result.first()
+
+        if not transaction_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"status": "error", "message": "Transaction not found"},
+            )
+
+        transaction, risk_score = transaction_data
+
+        # 2. Chỉ cho phép review giao dịch đang bị FLAGGED
+        if transaction.ai_review_status != AIReviewStatusEnum.FLAGGED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "status": "error",
+                    "message": "Transaction is not flagged for review",
+                    "current_status": transaction.ai_review_status,
+                },
+            )
+
+        # 3. Reviewer xác nhận giao dịch có gian lận hay không
+        if is_fraud:
+            # Reviewer xác nhận là gian lận
+            transaction.ai_review_status = AIReviewStatusEnum.CONFIRMED_FRAUD
+            transaction.status = TransactionStatusEnum.Failed
+
+            risk_score.is_confirmed_fraud = True
+            risk_score.reviewed_by = reviewer_id
+
+        else:
+            # Reviewer xác nhận giao dịch an toàn
+            transaction.ai_review_status = AIReviewStatusEnum.CLEARED
+
+        # 4. Nếu giao dịch được approve → thực hiện hoàn tất
+        if approve_transaction:
+            if transaction.transaction_type == TransactionTypeEnum.Transfer:
+                await _complete_approved_transfer(transaction, session)
+
+            elif transaction.transaction_type == TransactionTypeEnum.Withdrawal:
+                await _complete_approved_withdrawal(transaction, session)
+
+        # 5. Lưu metadata lịch sử duyệt fraud
+        if not transaction.transaction_metadata:
+            transaction.transaction_metadata = {}
+
+        transaction.transaction_metadata["fraud_review"] = {
+            "reviewed_at": datetime.now(timezone.utc).isoformat(),
+            "reviewed_by": str(reviewer_id),
+            "is_fraud": is_fraud,
+            "notes": notes,
+        }
+
+        # 6. Commit kết quả
+        session.add(transaction)
+        session.add(risk_score)
+        await session.commit()
+
+        return {
+            "status": "success",
+            "message": "Transaction reviewed successfully",
+            "transaction_id": str(transaction_id),
+            "is_fraud": is_fraud,
+            "review_status": transaction.ai_review_status,
+            "risk_score": risk_score.risk_score,
+        }
+    # Lỗi nghiệp vụ
+    except HTTPException:
+        raise
+    # Lỗi hệ thống
+    except Exception as e:
+        logger.error(f"Error reviewing transaction: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "status": "error",
+                "message": "Failed to review transaction",
+                "action": "Please try again later",
+            },
+        )
+async def _complete_approved_transfer(transaction: Transaction, session: AsyncSession):
+    """Hoàn tất giao dịch CHUYỂN TIỀN đã được reviewer chấp thuận sau khi bị AI flag."""
+    try:
+        # 1. Load thông tin người gửi, người nhận và các tài khoản liên quan
+        sender = await session.get(User, transaction.sender_id)
+        receiver = await session.get(User, transaction.receiver_id)
+
+        sender_account = await session.get(BankAccount, transaction.sender_account_id)
+        receiver_account = await session.get(
+            BankAccount, transaction.receiver_account_id
+        )
+
+        # 2. Validate dữ liệu bắt buộc (user / account)
+        # Nếu thiếu bất kỳ entity nào → dừng xử lý
+        if not sender:
+            raise ValueError("Sender not found")
+        if not receiver:
+            raise ValueError("Receiver not found")
+        if not sender_account:
+            raise ValueError("Sender account not found")
+        if not receiver_account:
+            raise ValueError("Receiver account not found")
+
+        # 3. Kiểm tra metadata giao dịch (bắt buộc với chuyển tiền quốc tế)
+        if not transaction.transaction_metadata:
+            raise ValueError("Transaction metadata is missing")
+
+        converted_amount_str = transaction.transaction_metadata.get("converted_amount")
+
+        if not converted_amount_str:
+            raise ValueError("Converted amount is missing from metadata")
+
+        # 4. Parse số tiền đã quy đổi (string → Decimal)
+        try:
+            converted_amount = Decimal(converted_amount_str)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"Invalid converted amount format:{converted_amount_str}"
+            )
+        # 5. Kiểm tra số dư hiện tại của người gửi
+        current_sender_balance = Decimal(str(sender_account.balance))
+
+        if current_sender_balance < transaction.amount:
+            raise ValueError("Insufficient balance for transfer")
+
+        try:
+
+            # 6. Thực hiện cập nhật số dư hai tài khoản
+            sender_account.balance = float(
+                current_sender_balance - transaction.amount
+            )
+            receiver_account.balance = float(
+                Decimal(str(receiver_account.balance)) + converted_amount
+            )
+
+            # 7. Đánh dấu giao dịch hoàn tất
+            transaction.status = TransactionStatusEnum.Completed
+            transaction.completed_at = datetime.now(timezone.utc)
+
+            # 8. Persist thay đổi vào database
+            session.add(sender_account)
+            session.add(receiver_account)
+            session.add(transaction)
+
+            await session.commit()
+
+            # 9. Refresh entity sau khi commit
+            await session.refresh(transaction)
+            await session.refresh(sender_account)
+            await session.refresh(receiver_account)
+
+            # 10. Gửi thông báo giao dịch cho người gửi & người nhận
+
+            try:
+                await send_transfer_alert(
+                    sender_email=sender.email,
+                    receiver_email=receiver.email,
+                    sender_name=sender.full_name,
+                    receiver_name=receiver.full_name,
+                    sender_account_number=sender_account.account_number or "Uknown",
+                    receiver_account_number=receiver_account.account_number
+                    or "Unknown",
+                    amount=transaction.amount,
+                    converted_amount=converted_amount,
+                    sender_currency=sender_account.currency,
+                    receiver_currency=receiver_account.currency,
+                    exchange_rate=Decimal(
+                        transaction.transaction_metadata.get("conversion_rate", "1"),
+                    ),
+                    conversion_fee=Decimal(
+                        transaction.transaction_metadata.get("conversion_fee", "0"),
+                    ),
+                    description=transaction.description,
+                    reference=transaction.reference,
+                    transaction_date=transaction.completed_at
+                    or transaction.created_at,
+                    sender_balance=Decimal(str(sender_account.balance)),
+                    receiver_balance=Decimal(str(receiver_account.balance)),
+                )
+                logger.info(
+                    f"Successfully sent transfer approval notificatoin "
+                    f"for transaction {transaction.reference}"
+                )
+            except Exception as e:
+                # Lỗi gửi email chỉ log, không rollback giao dịch
+                logger.error(
+                    f"Failed to send transfer approval notification: {e}"
+                )
+
+        except Exception as e:
+            # 11. Lỗi trong quá trình cập nhật số dư hoặc commit
+            await session.rollback()
+            raise ValueError(f"Failed to process transfer: {str(e)}")
+    except ValueError as e:
+        # 12. Lỗi validation / nghiệp vụ
+        # → rollback và đánh dấu giao dịch thất bại
+        await session.rollback()
+        logger.error(
+            f"Validation error in _complete_approved_transfer: {e}"
+        )
+        transaction.status = TransactionStatusEnum.Failed
+        transaction.transaction_metadata = {
+            **(transaction.transaction_metadata or {}),
+            "failure_reason": str(e),
+            "failed_at": datetime.now(timezone.utc).isoformat(),
+        }
+        session.add(transaction)
+        await session.commit()
+        raise
+    except Exception as e:
+        # 13. Lỗi hệ thống không mong muốn
+        await session.rollback()
+        logger.error(
+            f"Unexpected error in _complete_approved_transfer: {e}"
+        )
+        raise
+async def _complete_approved_withdrawal(
+    transaction: Transaction, session: AsyncSession
+):
+    """Hoàn tất giao dịch RÚT TIỀN đã được reviewer chấp thuận sau khi bị AI flag."""
+    try:
+        # Lấy thông tin người dùng thực hiện rút tiền
+        user = await session.get(User, transaction.sender_id)
+
+        # Lấy tài khoản nguồn dùng để rút tiền
+        account = await session.get(BankAccount, transaction.sender_account_id)
+
+        # Validate dữ liệu bắt buộc
+        if not user:
+            raise ValueError("User not found")
+        if not account:
+            raise ValueError("Account not found")
+
+        # Kiểm tra số dư tài khoản trước khi rút
+        if Decimal(str(account.balance)) < transaction.amount:
+            raise ValueError("Insufficient balance for withdrawal")
+
+        try:
+            # Trừ tiền khỏi số dư tài khoản
+            account.balance = float(
+                Decimal(str(account.balance)) - transaction.amount
+            )
+
+            # Cập nhật trạng thái giao dịch thành hoàn tất
+            transaction.status = TransactionStatusEnum.Completed
+            transaction.completed_at = datetime.now(timezone.utc)
+
+            # Lưu thay đổi vào database
+            session.add(account)
+            session.add(transaction)
+
+            await session.commit()
+
+            # Refresh dữ liệu sau khi commit
+            await session.refresh(transaction)
+            await session.refresh(account)
+
+            try:
+                # Gửi thông báo rút tiền thành công cho người dùng
+                await send_withdrawal_alert(
+                    email=user.email,
+                    full_name=user.full_name,
+                    amount=transaction.amount,
+                    account_name=account.account_name,
+                    account_number=account.account_number or "Unknown",
+                    currency=account.currency.value,
+                    desciption=transaction.description,
+                    transaction_date=transaction.completed_at
+                    or transaction.created_at,
+                    reference=transaction.reference,
+                    balance=Decimal(str(account.balance)),
+                )
+                logger.info(
+                    f"Successfully sent withdrawal approval notificatoin "
+                    f"for transaction {transaction.reference}"
+                )
+            except Exception as e:
+                # Lỗi gửi notification không ảnh hưởng đến giao dịch
+                logger.error(
+                    f"Failed to send withdrawal approval notification: {e}"
+                )
+
+        except Exception as e:
+            # Lỗi xảy ra trong quá trình xử lý rút tiền
+            await session.rollback()
+            raise ValueError(f"Failed to process withdrawal: {str(e)}")
+
+    except ValueError as e:
+        # Lỗi nghiệp vụ / validation
+        await session.rollback()
+        logger.error(
+            f"Validation error in _complete_approved_withdrawal: {e}"
+        )
+
+        # Đánh dấu giao dịch thất bại và ghi lại lý do
+        transaction.status = TransactionStatusEnum.Failed
+        transaction.transaction_metadata = {
+            **(transaction.transaction_metadata or {}),
+            "failure_reason": str(e),
+            "failed_at": datetime.now(timezone.utc).isoformat(),
+        }
+        session.add(transaction)
+        await session.commit()
+        raise
+
+    except Exception as e:
+        # Lỗi hệ thống không mong muốn
+        await session.rollback()
+        logger.error(
+            f"Unexpected error in _complete_approved_transfer: {e}"
+        )
+        raise
+async def get_user_risk_history(
+    user_id: uuid.UUID,
+    session: AsyncSession,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    min_risk_score: float | None = None,
+    skip: int = 0,
+    limit: int = 20,
+) -> tuple[list[dict], int]:
+    """Lấy lịch sử đánh giá rủi ro giao dịch của một người dùng"""
+    try:
+        # Tạo query cơ sở:
+        # - Lấy giao dịch của user
+        # - Join với bảng TransactionRiskScore
+        base_query = (
+            select(Transaction, TransactionRiskScore)
+            .join(TransactionRiskScore)
+            .where(Transaction.sender_id == user_id)
+        )
+
+        # Lọc theo khoảng thời gian (nếu có)
+        if start_date:
+            base_query = base_query.where(
+                Transaction.created_at >= start_date
+            )
+
+        if end_date:
+            base_query = base_query.where(
+                Transaction.created_at <= end_date
+            )
+
+        # Lọc theo điểm rủi ro tối thiểu (nếu có)
+        if min_risk_score is not None:
+            base_query = base_query.where(
+                TransactionRiskScore.risk_score >= min_risk_score
+            )
+
+        # Sắp xếp:
+        # - Giao dịch mới nhất trước
+        # - Giao dịch có risk score cao ưu tiên hơn
+        base_query = base_query.order_by(
+            desc(Transaction.created_at),
+            desc(TransactionRiskScore.risk_score),
+        )
+
+        # Đếm tổng số bản ghi (phục vụ phân trang)
+        count_query = select(func.count()).select_from(
+            base_query.subquery()
+        )
+        total_result = await session.exec(count_query)
+        total_count = total_result.first() or 0
+
+        # Áp dụng phân trang (offset / limit)
+        paginated_query = base_query.offset(skip).limit(limit)
+
+        result = await session.exec(paginated_query)
+        transactions = result.all()
+
+        # Chuẩn hóa dữ liệu trả về cho API
+        history = []
+
+        for transaction, risk_score in transactions:
+            history.append(
+                {
+                    "transaction_id": str(transaction.id),
+                    "reference": transaction.reference,
+                    "amount": str(transaction.amount),
+                    "created_at": transaction.created_at,
+                    "risk_score": risk_score.risk_score,
+                    "risk_factors": risk_score.risk_factors,
+                    "review_status": transaction.ai_review_status,
+                    "is_confirmed_fraud": risk_score.is_confirmed_fraud,
+                    "reviewed_by": (
+                        str(risk_score.reviewed_by)
+                        if risk_score.reviewed_by
+                        else None
+                    ),
+                    "review_details": (
+                        transaction.transaction_metadata.get("fraud_review")
+                        if transaction.transaction_metadata
+                        else None
+                    ),
+                }
+            )
+
+        # Trả về:
+        # - Danh sách lịch sử rủi ro
+        # - Tổng số bản ghi (phục vụ frontend pagination)
+        return history, total_count
+
+    except Exception as e:
+        # Xử lý lỗi hệ thống
+        logger.error(f"Error getting risk history: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "status": "error",
+                "message": "Failed to retrieve risk history",
+                "action": "Please try again later",
+            },
+        )

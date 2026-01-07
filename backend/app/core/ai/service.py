@@ -2,14 +2,12 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from fastapi import Depends
-from sqlmodel import desc, select
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from backend.app.core.ai.config import ai_settings
 from backend.app.core.ai.enums import AIReviewStatusEnum
 from backend.app.core.ai.models import TransactionRiskScore
-from backend.app.core.db import get_session
 from backend.app.core.logging import get_logger
 from backend.app.transaction.enums import TransactionFailureReason
 from backend.app.transaction.models import Transaction
@@ -18,7 +16,7 @@ from .transaction_analyzer import TransactionAnalyzer
 
 logger = get_logger()
 
-class TransactionAiService:
+class TransactionAIService:
     """Service xử lý phân tích rủi ro giao dịch bằng AI."""
 
     def __init__(self, session: AsyncSession):
