@@ -11,6 +11,7 @@ from backend.app.transaction.enums import (
     TransactionTypeEnum,
     TransactionCategoryEnum
 )
+from backend.app.core.ai.enums import AIReviewStatusEnum
 class TransactionBaseSchema(SQLModel):
     """Schema nền tảng cho giao dịch tài chính."""
     amount: Annotated[Decimal, Field(decimal_places=2, ge=0)]  # Số tiền giao dịch
@@ -23,6 +24,8 @@ class TransactionBaseSchema(SQLModel):
     balance_after: Annotated[Decimal, Field(decimal_places=2)]   # Số dư sau giao dịch
     transaction_metadata: dict | None = Field(default=None, sa_column=Column(JSONB))  # Dữ liệu bổ sung (JSON)
     failed_reason: str | None = Field(default=None)  # Lý do thất bại (nếu có)
+    # Trạng thái đánh giá rủi ro giao dịch bởi hệ thống AI
+    ai_review_status: AIReviewStatusEnum | None = Field(default=None)
 
 class TransactionCreateSchema(TransactionBaseSchema):
     pass
@@ -173,3 +176,36 @@ class StatementResponseSchema(SQLModel):
     statement_id: str | None = None    # ID sao kê
     generated_at: datetime | None = None  # Thời điểm tạo sao kê
     expires_at: datetime | None = None    # Thời điểm hết hạn sao kê
+
+class RiskHistoryParams(SQLModel):
+    """Tham số lọc và phân trang lịch sử đánh giá rủi ro."""
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    min_risk_score: float | None = None
+    user_id: str | None = None
+    skip: int = 0
+    limit: int = 20
+
+class RiskHistoryItemSchema(SQLModel):
+    """
+    Schema đại diện cho một bản ghi lịch sử đánh giá rủi ro giao dịch.
+    """
+    transaction_id: str # Mã định danh giao dịch
+    reference: str    # Mã tham chiếu giao dịch
+    amount: str    # Số tiền giao dịch (đã định dạng)
+    created_at: datetime    # Thời điểm phát sinh giao dịch
+    risk_score: float    # Điểm rủi ro do AI đánh giá (0–1)
+    risk_factors: dict    # Các yếu tố rủi ro AI phát hiện (lưu dạng JSON)
+    review_status: AIReviewStatusEnum | None = None    # Trạng thái đánh giá của AI
+    is_confirmed_fraud: bool | None = None    # Kết quả xác nhận gian lận cuối cùng
+    reviewed_by: str | None = None    # Người thực hiện kiểm duyệt thủ công (nếu có)
+    review_details: dict | None = None    # Thông tin chi tiết quá trình kiểm duyệt
+
+class PaginatedHistoryResponseSchema(SQLModel):
+    """
+    Schema phản hồi danh sách lịch sử đánh giá rủi ro giao dịch có phân trang.
+    """
+    total: int
+    skip: int
+    limit: int
+    items: list[RiskHistoryItemSchema]
