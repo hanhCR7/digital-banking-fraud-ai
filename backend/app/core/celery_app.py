@@ -1,5 +1,7 @@
 from celery import Celery
 from backend.app.core.config import settings
+from backend.app.core.ml.config import ml_settings
+from celery.schedules import crontab
 
 celery_app = Celery(
     "worker",
@@ -38,3 +40,49 @@ celery_app.autodiscover_tasks(
     related_name="tasks",
     force=True,
 )
+
+celery_app.conf.beat_scheduler = "redisbeat.RedisScheduler"
+
+celery_app.conf.beat_scheduler = {
+    #  Train model gian lận hàng ngày
+    "train-fraud-model-daily": {
+        "task": "train_fraud_detection_model",
+        "schedule": crontab(hour="2", minute="0"), # 02:00 hàng ngày
+        "kwargs": {
+            "days_lookback": ml_settings.DEFAULT_TRAINING_LOOKBACK_DAYS,
+            "hyperparams": ml_settings.DEFAULT_GRADIENT_BOOSTING_PARAMS
+        },
+        "options": {"queue": "ml_tasks"}, # Chạy trên queue ML
+
+    },
+    # Train model chuyên sâu hàng tuần
+    "train-fraud-model-weekly": {
+        "task": "train_fraud_detection_model",
+        "schedule": crontab(hour="3", minute="0", day_of_week="0"), # CN: 03:00
+        "kwargs": {
+            "days_lookback": 180, # Data 6 tháng
+            "hyperparams": {
+                **ml_settings.DEFAULT_GRADIENT_BOOSTING_PARAMS,
+                "n_estimators": 200,                # Nhiều cây hơn
+                "learning_rate": 0.05,              # Learning rate nhỏ hơn
+            }
+        },
+        "options": {"queue": "ml_tasks"}
+    },
+    # Đánh giá hiệu năng model hàng này
+    "evaluate-fraud-model-daily": {
+        "task": "evaluate_fraud_model_performance",
+        "schedule": crontab(hour="6", minute="0"), # 06:00 hàng ngày
+        "kwargs": {"days": 7}, # Evalyate 7 ngày gần nhất
+        "options": {"queue": "ml_tasks"}
+    }, 
+    # Tự động deploy model tốt nhất hàng tuần
+    "auto-deploy-weekly": {
+        "task": "auto_deploy_best_model",
+        "schedule": crontab(hour="8", minute="0", day_of_week="1"), # Thứ 2
+        "kwargs": {
+            "performance_threshold": ml_settings.DEFAULT_PERFORMANCE_THRESHOLD
+        },
+        "options": {"queue":"ml_tasks"}
+    }
+}

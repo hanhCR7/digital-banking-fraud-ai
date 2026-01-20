@@ -19,8 +19,7 @@ def get_currency_code(currency: AccountCurrencyEnum) -> str:
         AccountCurrencyEnum.USD: settings.CURRENCY_CODE_USD,
         AccountCurrencyEnum.EUR: settings.CURRENCY_CODE_EUR,
         AccountCurrencyEnum.GBP: settings.CURRENCY_CODE_GBP,
-        AccountCurrencyEnum.KES: settings.CURRENCY_CODE_KES,
-        AccountCurrencyEnum.VND: settings.CURRENCY_CODE_VND,
+        AccountCurrencyEnum.KES: settings.CURRENCY_CODE_KES
     }
 
     currency_code = currency_codes.get(currency)
@@ -98,11 +97,10 @@ def generate_account_number(currency: AccountCurrencyEnum) -> str:
 
 # Bảng tỷ giá giả lập (không phải realtime)
 EXCHANGE_RATES = {
-    "USD": {"EUR": Decimal("0.93"), "GBP": Decimal("0.79"), "KES": Decimal("163.50"), "VND": Decimal("26077.00")},
-    "EUR": {"USD": Decimal("1.0753"), "GBP": Decimal("0.8495"), "KES": Decimal("175.81"), "VND": Decimal("28040.86")},
-    "GBP": {"USD": Decimal("1.2658"), "EUR": Decimal("1.1772"), "KES": Decimal("206.96"), "VND": Decimal("33072.15")},
-    "KES": {"USD": Decimal("0.0061"), "EUR": Decimal("0.0057"), "GBP": Decimal("0.0048"), "VND": Decimal("159.45")},
-    "VND": {"USD": Decimal("0.00003835"), "EUR": Decimal("0.00003321"), "GBP": Decimal("0.00003030"), "KES": Decimal("0.00627")},
+    "USD": {"EUR": Decimal("0.93"), "GBP": Decimal("0.79"), "KES": Decimal("163.50")},
+    "EUR": {"USD": Decimal("1.0753"), "GBP": Decimal("0.8495"), "KES": Decimal("175.81")},
+    "GBP": {"USD": Decimal("1.2658"), "EUR": Decimal("1.1772"), "KES": Decimal("206.96")},
+    "KES": {"USD": Decimal("0.0061"), "EUR": Decimal("0.0057"), "GBP": Decimal("0.0048")},
 }
 
 CONVERSION_FEE_RATE = Decimal("0.005")  # Phí chuyển đổi 0.5%
@@ -148,9 +146,8 @@ def calculate_conversion(
     # Tính số tiền sau phí
     amount_after_fee = amount - conversion_fee
     # Tính số tiền sau chuyển đổi
-    quantize = Decimal("1") if to_currency == AccountCurrencyEnum.VND else Decimal("0.01")
     converted_amount = (amount_after_fee * exchange_rate).quantize(
-        quantize, rounding=ROUND_HALF_UP
+        Decimal("0.01"), rounding=ROUND_HALF_UP
     )
 
     return converted_amount, exchange_rate, conversion_fee

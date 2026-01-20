@@ -426,7 +426,7 @@ class TransactionAnalyzer:
             )
 
             # 7. Rule tăng mức rủi ro:
-            # Nếu số tiền lớn + tần suất cao → ép mức nguy hiểm cao
+            # Nếu số tiền lớn + tần suất cao -> ép mức nguy hiểm cao
             final_score = (
                 max(base_score, 0.9)
                 if (
@@ -479,10 +479,7 @@ class TransactionAnalyzer:
             currency = sender_account.currency if sender_account else "USD"
             risk_factors["transaction_summary"] = {
                 # Số tiền giao dịch (format để hiển thị / log)
-                "amount": format_currency(
-                    transaction.amount,
-                    currency,
-                ),
+                "amount": format_currency( transaction.amount),
                 "time": transaction.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                 # Tổng khối lượng giao dịch trong 24h gần nhất
                 "24h_total_volume": format_currency(
@@ -490,8 +487,7 @@ class TransactionAnalyzer:
                         float(t.amount)
                         for t in history
                         if (transaction.created_at - t.created_at).total_seconds() <= 86400
-                    ),
-                    currency,
+                    )
                 ),
                 # Số lượng giao dịch trong 24h gần nhất
                 "24h_transaction_count": sum(

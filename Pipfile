@@ -33,6 +33,7 @@ joblib = "==1.4.2"
 pandas = "==2.2.3"
 psycopg = {extras = ["binary"], version = "*"}
 reportlab = "==4.2.2"
+mlflow = "*"
 
 [dev-packages]
 

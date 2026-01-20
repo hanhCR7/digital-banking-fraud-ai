@@ -24,4 +24,3 @@ class AccountCurrencyEnum(str, Enum):
     EUR = "EUR"                  # Euro
     GBP = "GBP"                  # Bảng Anh
     KES = "KES"                  # Đồng Shilling Kenya
-    VND = "VND"                  # Đồng Việt Nam

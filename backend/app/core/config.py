@@ -78,7 +78,6 @@ class Setting(BaseSettings):
     CURRENCY_CODE_EUR: str = "02"
     CURRENCY_CODE_GBP: str = "03"
     CURRENCY_CODE_KES: str = "04"
-    CURRENCY_CODE_VND: str = "05"
     MAX_BANK_ACCOUNTS: int = 3 # Số tài khoản ngân hàng tối đa cho mỗi người dùng
 settings = Setting()
 # Cấu hình Cloudinary khi khởi động ứng dụng
