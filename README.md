@@ -41,11 +41,7 @@ NextGen Bank là một hệ thống API ngân hàng số được xây dựng nh
 | **Data Processing** | Pandas, NumPy, SciPy |
 | **Visualization** | Matplotlib |
 
-### Frontend
-| Thành phần | Công nghệ |
-|---|---|
-| **Framework** | React (Next.js) |
-| **Containerization** | Docker + Docker Compose |
+
 
 ### Infrastructure
 | Thành phần | Công nghệ |
