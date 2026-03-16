@@ -7,7 +7,7 @@ from backend.app.core.emails.base import EmailTemplate
 class VirtualCardCreatedEmail(EmailTemplate):
     template_name = "card_created.html"
     template_name_plain = "card_created.txt"
-    subject = "Your Virtual Card Has been Created"
+    subject = "Thẻ ảo của bạn đã được tạo"
 
 
 async def send_card_created_email(

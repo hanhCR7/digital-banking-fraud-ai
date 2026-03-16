@@ -13,7 +13,7 @@ _ph = PasswordHasher()
 
 def generate_otp(length: int =6) -> str:
     """Tạo mã OTP gồm các chữ số ngẫu nhiên."""
-    otp = "".join(random.choices(string.digits, k=length))
+    otp = "".join(random.choices(string.digits, k=length))# 
     return otp
 
 def generate_password_hash(password: str) -> str:
@@ -63,7 +63,11 @@ def create_activation_token(id: uuid.UUID) -> str:
         algorithm=settings.JWT_ALGORITHM
     )
 # Tạo JWT token dùng cho việc xác thực người dùng (login)
-def create_jwt_token(id: uuid.UUID, type: str = settings.COOKIE_ACCESS_NAME) -> str:
+def create_jwt_token(
+        id: uuid.UUID, 
+        role: str | None = None,
+        type: str = settings.COOKIE_ACCESS_NAME
+    ) -> str:
     if type == settings.COOKIE_ACCESS_NAME:
         expire_delta = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRATION_MINUTES)
     else:
@@ -72,6 +76,7 @@ def create_jwt_token(id: uuid.UUID, type: str = settings.COOKIE_ACCESS_NAME) -> 
     payload = {
         "id": str(id),
         "type": type,
+        "role": role,
         "exp": datetime.now(timezone.utc) + expire_delta,
         "iat": datetime.now(timezone.utc),
     }

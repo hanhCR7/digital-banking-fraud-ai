@@ -3,8 +3,8 @@
 {% block content %}{% endblock %}
 
 {% block footer %}
-    If you have any questions, please contact us at{{ support_email }}.
+    Nếu bạn có bất kỳ câu hỏi nào, vui lòng liên hệ với chúng tôi qua{{ support_email }}.
     
-    Thanks for using our service! © {{ site_name }} Team. All rights reserved.
+    Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi! © {{ site_name }} Team. Bảo lưu mọi quyền.
       
 {% endblock %}

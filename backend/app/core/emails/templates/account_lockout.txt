@@ -1,25 +1,25 @@
 {% extends "base.txt" %}
 
-{% block header %} Account Security Alert {% endblock %}
+{% block header %} Cảnh báo bảo mật tài khoản {% endblock %}
 
 {% block content %}
-Hello,
+Xin chào,
 
-For your security, your user account has been temporarily locked due to multiple failed login attempts.
+Vì lý do bảo mật, tài khoản người dùng của bạn đã bị tạm thời khóa do có nhiều lần đăng nhập không thành công.
 
-Your account will be automatically unlocked after {{ lockout_duration }} minutes.
+Tài khoản của bạn sẽ được tự động mở khóa sau {{ lockout_duration }} phút.
 
-If you did not attempt to login to your account, we recommend:
-
-
-  1. Change your password immediately when your account unlocks.
-  2. Contact our support team if you believe your account has been compromised
-  3. Check your email for any suspicious activity.
+Nếu bạn không thực hiện các lần đăng nhập này, chúng tôi khuyến nghị:
 
 
-Time of lockout: {{ lockout_time }}
-Account will unlock at: {{ unlock_time }}
+  1. Thay đổi mật khẩu ngay khi tài khoản được mở khóa.
+  2. Liên hệ với bộ phận hỗ trợ nếu bạn nghi ngờ tài khoản đã bị xâm phạm.
+  3. Kiểm tra email của bạn để phát hiện các hoạt động đáng ngờ.
 
-If you need immediate assistance, please contact our support team.
+
+Thời điểm khóa tài khoản: {{ lockout_time }}
+Tài khoản sẽ được mở khóa vào: {{ unlock_time }}
+
+Nếu bạn cần hỗ trợ ngay lập tức, vui lòng liên hệ với bộ phận hỗ trợ.
 
 {% endblock %}

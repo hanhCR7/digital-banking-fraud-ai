@@ -1,28 +1,28 @@
 {% extends "base.txt" %}
 
-{% block header %} Transaction Alert {% endblock %}
+{% block header %} Cảnh Báo Giao Dịch {% endblock %}
 
 {% block content %}
 
-Dear {{full_name}},
+Kính gửi {{ full_name }},
 
-A transaction has occurred on your account with the following details:
+Một giao dịch vừa phát sinh trên tài khoản của bạn với các thông tin chi tiết như sau:
 
 
   
-  Transaction Type: {{ action }}
-  Amount:  {{ currency }} {{ amount }}
-  Account Name: {{ account_name }}
-  Account Number: {{ account_number }}
+  Loại giao dịch: {{ action }}
+  Số tiền: {{ currency }} {{ amount }}
+  Tên tài khoản: {{ account_name }}
+  Số tài khoản: {{ account_number }}
 
-  Description: {{ description }} 
-  Date: {{ transaction_date }}
-  Reference: {{ reference }}
-  Available Balance: {{ currency }} {{ balance }}
+  Nội dung: {{ description }} 
+  Thời gian: {{ transaction_date }}
+  Mã tham chiếu: {{ reference }}
+  Số dư khả dụng: {{ currency }} {{ balance }}
 
 
 
-Security Tip: If you did not authorize this transaction, please contact our
-    support team immediately.
+Mẹo bảo mật: Nếu bạn không thực hiện hoặc không cho phép giao dịch này,
+vui lòng liên hệ ngay với bộ phận hỗ trợ của chúng tôi.
 
 {% endblock %}

@@ -10,7 +10,8 @@ from backend.app.core.db import get_session
 from backend.app.core.logging import get_logger
 from backend.app.core.services.card_blocked import send_card_blocked_email
 from backend.app.virtual_card.schema import CardBlockSchema
-
+from backend.app.api.services.security import require_permission
+from backend.app.permission.schema import PermissionChoicesSchema
 logger = get_logger()
 router = APIRouter(prefix="/virtual-card", tags=["Virtual Card"])
 
@@ -18,12 +19,13 @@ router = APIRouter(prefix="/virtual-card", tags=["Virtual Card"])
 @router.post(
     "/{card_id}/block",
     status_code=status.HTTP_200_OK,
-    description="Block a virtual card. Can be performed by card owner or account executive",
+    dependencies=[],
+    description="Khóa thẻ ảo. Chỉ Account Executive hoặc chủ thẻ được phép thực hiện hành động này",
 )
 async def block_card(
     card_id: UUID,
     block_data: CardBlockSchema,
-    current_user: CurrentUser,
+    current_user = Depends(require_permission(PermissionChoicesSchema.BLOCK_CARD)),
     session: AsyncSession = Depends(get_session),
 ):
     # API khóa thẻ ảo (chủ thẻ hoặc Account Executive đều có quyền)
@@ -55,12 +57,12 @@ async def block_card(
             )
         except Exception as email_error:
             # Không rollback nếu gửi email thất bại
-            logger.error(f"Failed to send card blocked email: {email_error}")
+            logger.error(f"Gửi thông báo khóa thẻ thất bại: {email_error}")
 
         # Trả về kết quả khóa thẻ
         return {
             "status": "success",
-            "message": "Card blocked successfully",
+            "message": "Khóa thẻ thành công.",
             "data": {
                 "card_id": str(card.id),
                 "status": card.card_status.value,
@@ -79,11 +81,11 @@ async def block_card(
 
     except Exception as e:
         # Lỗi hệ thống không xác định
-        logger.error(f"Failed to block virtual card: {e}")
+        logger.error(f"Khóa thẻ thất bại: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to block virtual card",
+                "message": "Khóa thẻ thất bại.",
             },
         )

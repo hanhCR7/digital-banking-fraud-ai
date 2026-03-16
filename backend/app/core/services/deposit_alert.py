@@ -8,7 +8,7 @@ from backend.app.core.emails.base import EmailTemplate
 class DepositAlertEmail(EmailTemplate):
     template_name = "deposit_alert.html"
     template_name_plain = "deposit_alert.txt"
-    subject = "Deposit Alert"
+    subject = "Thông báo nạp tiền"
 
 
 async def send_deposit_alert(

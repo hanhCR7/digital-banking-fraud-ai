@@ -37,7 +37,7 @@ class MLModel(SQLModel, table=True):
     )
     precision: float = Field(default=0.0)
     recall: float = Field(default=0.0)
-    f1_score: float = Field(default=0.0)
+    f1_score: float = Field(default=0.0) 
 
     # Danh sách feature được sử dụng để huấn luyện
     features: list[str] = Field(

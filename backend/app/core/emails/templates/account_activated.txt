@@ -1,30 +1,30 @@
 {% extends "base.html" %}
 
-{% block header %} Your Account is now Active {% endblock %}
+{% block header %} Tài khoản của bạn hiện đã được kích hoạt {% endblock %}
 
 {% block content %}
 
-Dear {{full_name}}
+Kính gửi {{ full_name }}
 
-Great news! Your bank account has been fully activated, following successful verification of your KYC information.
+Chúng tôi xin thông báo rằng tài khoản ngân hàng của bạn đã được kích hoạt thành công sau khi quá trình xác minh thông tin KYC hoàn tất.
 
 
-Account Details: 
+Thông tin tài khoản:
 
-- Account Number: {{ account_number }}
-- Account Name: {{ account_name }}
-- Account Type: {{ account_type }}
-- Currency:  {{ currency }} 
+- Số tài khoản: {{ account_number }}
+- Tên tài khoản: {{ account_name }}
+- Loại tài khoản: {{ account_type }}
+- Loại tiền tệ: {{ currency }}
 
-Your account is now fully operational. You can now:
-  
-* Make deposits and withdrawals
-* View your account statements and transaction history
-* Use mobile banking and internet banking services
-* Access your account information anytime, anywhere
+Tài khoản của bạn hiện đã hoạt động đầy đủ. Bạn có thể:
 
-If you notice any suspicious activity on your account, please contact our customer support team immediately.
+* Thực hiện giao dịch gửi tiền và rút tiền
+* Xem sao kê tài khoản và lịch sử giao dịch
+* Sử dụng dịch vụ ngân hàng di động và ngân hàng trực tuyến
+* Truy cập thông tin tài khoản mọi lúc, mọi nơi
 
-Thank you for choosing {{ site_name }}
+Nếu bạn phát hiện bất kỳ hoạt động đáng ngờ nào trên tài khoản, vui lòng liên hệ ngay với bộ phận hỗ trợ khách hàng.
+
+Cảm ơn bạn đã lựa chọn {{ site_name }}
 
 {% endblock %}

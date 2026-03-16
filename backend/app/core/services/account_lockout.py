@@ -7,7 +7,7 @@ from backend.app.core.emails.base import EmailTemplate
 class AccountLockoutEmail(EmailTemplate):
     template_name = "account_lockout.html"
     template_name_plain = "account_lockout.txt"
-    subject = "Account Security Alert - Temporary Lock"
+    subject = "Cảnh báo bảo mật tài khoản – Tạm thời khóa"
 
 # Gửi email thông báo khóa tài khoản do đăng nhập sai nhiều lần
 async def send_account_lockout_email(email: str, lockout_time: datetime) -> None:

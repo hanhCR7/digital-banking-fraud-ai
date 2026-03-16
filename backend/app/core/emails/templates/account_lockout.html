@@ -1,27 +1,27 @@
 {% extends "base.html" %}
 
-{% block title %} Account Temporarily Locked {% endblock %}
+{% block title %} Tài khoản tạm thời bị khóa {% endblock %}
 
-{% block header %} Account Security Alert {% endblock %}
+{% block header %} Cảnh báo bảo mật tài khoản {% endblock %}
 
 {% block content %}
-<p>Hello,</p>
+<p>Xin chào,</p>
 
-<p>For your security, your user account has been temporarily locked due to multiple failed login attempts.</p>
+<p>Vì lý do bảo mật, tài khoản người dùng của bạn đã bị tạm thời khóa do có nhiều lần đăng nhập không thành công.</p>
 
-<p>Your account will be automatically unlocked after {{ lockout_duration }} minutes.</p>
+<p>Tài khoản của bạn sẽ được tự động mở khóa sau {{ lockout_duration }} phút.</p>
 
-<p>If you did not attempt to login to your account, we recommend:</p>
+<p>Nếu bạn không thực hiện các lần đăng nhập này, chúng tôi khuyến nghị:</p>
 
 <ul style="list-style-type: none; padding-left: 0;">
-  <li style="margin: 10px 0;">1. Change your password immediately when your account unlocks.</li>
-  <li style="margin: 10px 0;">2. Contact our support team if you believe your account has been compromised</li>
-  <li style="margin: 10px 0;">3. Check your email for any suspicious activity.</li>
+  <li style="margin: 10px 0;">1. Thay đổi mật khẩu ngay khi tài khoản được mở khóa.</li>
+  <li style="margin: 10px 0;">2. Liên hệ với bộ phận hỗ trợ nếu bạn nghi ngờ tài khoản đã bị xâm phạm.</li>
+  <li style="margin: 10px 0;">3. Kiểm tra email của bạn để phát hiện các hoạt động đáng ngờ.</li>
 </ul>
 
-<p>Time of lockout: {{ lockout_time }}</p>
-<p>Account will unlock at: {{ unlock_time }}</p>
+<p>Thời điểm khóa tài khoản: {{ lockout_time }}</p>
+<p>Tài khoản sẽ được mở khóa vào: {{ unlock_time }}</p>
 
-<p>If you need immediate assistance, please contact our support team.</p>
+<p>Nếu bạn cần hỗ trợ ngay lập tức, vui lòng liên hệ với bộ phận hỗ trợ.</p>
 
 {% endblock %}

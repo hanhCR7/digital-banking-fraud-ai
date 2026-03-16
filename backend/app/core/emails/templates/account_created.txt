@@ -1,23 +1,22 @@
 {% extends "base.txt" %}
 
-{% block header %} Welcome to {{ site_name }} {% endblock %}
+{% block header %} Chào mừng bạn đến với {{ site_name }} {% endblock %}
 
 {% block content %}
 
-Dear {{full_name}},
+Kính gửi {{ full_name }},
 
-We're excited to inform you that your new bank account has been created successfully.
+Chúng tôi xin thông báo rằng tài khoản ngân hàng mới của bạn đã được tạo thành công.
 
-Here are the details of your account:
+Dưới đây là thông tin chi tiết tài khoản của bạn:
 
-- Account Number: {{ account_number }}
-- Account Name: {{ account_name }}
-- Account Type: {{ account_type }}
-- Currency:  {{ currency }} 
+- Số tài khoản: {{ account_number }}
+- Tên tài khoản: {{ account_name }}
+- Loại tài khoản: {{ account_type }}
+- Loại tiền tệ: {{ currency }}
 
 
-Important: To fully activate your account, please visit our nearest bank
-    branch with your {{ identification_type }} or any other valid ID document for verification
-
+Lưu ý: Để kích hoạt đầy đủ tài khoản, vui lòng đến chi nhánh ngân hàng gần nhất và mang theo
+{{ identification_type }} hoặc một giấy tờ tùy thân hợp lệ khác để xác minh.
 
 {% endblock %}

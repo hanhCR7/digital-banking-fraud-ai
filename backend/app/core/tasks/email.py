@@ -29,9 +29,9 @@ def send_email_task(
             multipart_subtype=MultipartSubtypeEnum.alternative,
         )
         asyncio.run(fast_mail.send_message(message))
-        logger.info(f"Email successfully sent to {recipients} with subject {subject}")
+        logger.info(f"Đã gửi email thành công tới '{recipients}' với tiêu đề '{subject}'")
         return True
     except Exception as e:
-        logger.error(f"Failed to send email to {recipients}: Error: {str(e)}")
+        logger.error(f"Gửi email tới '{recipients}' thất bại. Lỗi: {e}")
         return False
     

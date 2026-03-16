@@ -30,7 +30,7 @@ class EmailTemplate:
             # Theo best practice khi gửi email
             if not cls.template_name or not cls.template_name_plain:
                 raise ValueError(
-                    "Both HTML and plain text email templates are required"
+                    "Cần có cả hai mẫu email: HTML và văn bản thuần (plain text)."
                 )
             # Load template HTML và plain text
             html_template = email_env.get_template(cls.template_name)
@@ -47,11 +47,8 @@ class EmailTemplate:
                 plain_content=plain_content,
             )
             # Ghi log khi tác vụ gửi email được đưa vào hàng đợi thành công
-            logger.info(
-                logger.info(f"Email task {task.id} queued for: {recipients_list}")
-            )
+            logger.info(f"Nhiệm vụ gửi email {task.id} đã được đưa vào hàng đợi cho: {recipients_list}")
+        
         except Exception as e:
-            logger.error(
-                f"Failed to queue email task for {recipients_list}: Error: {str(e)}"
-            )
+            logger.error(f"Không thể đưa nhiệm vụ gửi email vào hàng đợi cho {recipients_list}: Lỗi: {str(e)}")
             raise

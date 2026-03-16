@@ -20,7 +20,4 @@ class AccountStatusEnum(str, Enum):
 
 # Enum định nghĩa các loại tiền tệ được hỗ trợ
 class AccountCurrencyEnum(str, Enum):
-    USD = "USD"                  # Đô la Mỹ
-    EUR = "EUR"                  # Euro
-    GBP = "GBP"                  # Bảng Anh
-    KES = "KES"                  # Đồng Shilling Kenya
+    VND = "VND"

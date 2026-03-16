@@ -1,6 +1,7 @@
 import asyncio
 from typing import AsyncGenerator
 from backend.app.core.config import settings
+from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.pool import AsyncAdaptedQueuePool
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -27,26 +28,38 @@ async_session = async_sessionmaker(
     class_=AsyncSession
 )
 
+def _is_http_error(exc: BaseException) -> bool:
+    """True nếu là lỗi HTTP (401, 403, 500...) — không log nhầm thành lỗi DB."""
+    if isinstance(exc, HTTPException):
+        return True
+    code = getattr(exc, "status_code", None)
+    if code is not None and 400 <= code < 600:
+        return True
+    return False
+
+
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     session = async_session()
     try:
         yield session
-    except Exception as e:
-        logger.error(f"Database session error: {e}")
+    except BaseException as e:
+        if _is_http_error(e):
+            raise
+        logger.error(f"Lỗi phiên làm việc với cơ sở dữ liệu: {e}")
         if session:
             try:
                 await session.rollback()
-                logger.info("successfully rolled back session after error")
+                logger.info("Đã rollback phiên làm việc thành công sau khi xảy ra lỗi")
             except Exception as rollback_error:
-                logger.error(f"Error during session rollback: {rollback_error}")
+                logger.error(f"Lỗi khi rollback phiên làm việc với cơ sở dữ liệu: {rollback_error}")
         raise
     finally:
         if session:
             try:
                 await session.close()
-                logger.debug("Database session closed successfully")
+                logger.debug("Đã đóng phiên làm việc với cơ sở dữ liệu thành công")
             except Exception as close_error:
-                logger.error(f"Error closing database session: {close_error}")
+                logger.error(f"Lỗi khi đóng phiên làm việc với cơ sở dữ liệu: {close_error}")
         
 async def init_db() -> None:
     try:
@@ -60,18 +73,18 @@ async def init_db() -> None:
             try:
                 async with engine.begin() as conn:
                     await conn.execute(text("SELECT 1"))
-                logger.info("Database connection verified successfully")
+                logger.info("Đã xác minh kết nối cơ sở dữ liệu thành công")
                 break
             except Exception:
                 if attempt == max_retries - 1:
                     logger.error(
-                        f"Failed to verify database connection after {max_retries} attempts"
+                        f"Không thể xác minh kết nối cơ sở dữ liệu sau {max_retries} lần thử"
                     )
                     raise
-                logger.warning(f"Database connection attempt {attempt + 1}")
+                logger.warning(f"Thử kết nối cơ sở dữ liệu lần {attempt + 1}")
 
                 await asyncio.sleep(retry_delay * (attempt + 1))
 
     except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
+        logger.error(f"Khởi tạo cơ sở dữ liệu thất bại: {e}")
         raise

@@ -34,7 +34,7 @@ ROLE_PERMISSIONS_SEED: dict[
         PermissionChoicesSchema.UPDATE_MY_PROFILE,
 
         PermissionChoicesSchema.VIEW_TRANSACTION_HISTORY,
-        PermissionChoicesSchema.GENERATE_STATEMENT,
+        PermissionChoicesSchema.CREATE_ACCOUNT,
         PermissionChoicesSchema.INITIATE_MONEY_TRANSFER,
         PermissionChoicesSchema.COMPLETE_MONEY_TRANSFER,
         PermissionChoicesSchema.GENERATE_STATEMENT,
@@ -57,14 +57,15 @@ ROLE_PERMISSIONS_SEED: dict[
     RoleChoicesSchema.ACCOUNT_EXECUTIVE: [
         PermissionChoicesSchema.VIEW_ALL_PROFILES,
         PermissionChoicesSchema.VIEW_TRANSACTION_HISTORY,
-        PermissionChoicesSchema.VIEW_NEXT_OF_KIN,
         PermissionChoicesSchema.REVIEW_TRANSACTION,
+        PermissionChoicesSchema.BLOCK_CARD,
     ],
 
     # TELLER – giao dịch viên
     RoleChoicesSchema.TELLER: [
         PermissionChoicesSchema.CREATE_DEPOSIT,
-        PermissionChoicesSchema.COMPLETE_MONEY_TRANSFER,
+        PermissionChoicesSchema.CREATE_WITHDRAWAL,
+        PermissionChoicesSchema.INITIATE_MONEY_TRANSFER
     ],
 
     # BRANCH MANAGER – phê duyệt & risk
@@ -72,11 +73,9 @@ ROLE_PERMISSIONS_SEED: dict[
         PermissionChoicesSchema.ACTIVATE_ACCOUNT,
         PermissionChoicesSchema.ACTIVATE_CARD,
         PermissionChoicesSchema.BLOCK_CARD,
-
         PermissionChoicesSchema.REVIEW_TRANSACTION,
         PermissionChoicesSchema.REVIEW_FRAUD_CASE,
         PermissionChoicesSchema.VIEW_RISK_HISTORY,
-
         PermissionChoicesSchema.COMPLETE_MONEY_TRANSFER,
     ],
 

@@ -8,7 +8,7 @@ from backend.app.core.emails.base import EmailTemplate
 class PasswordResetEmail(EmailTemplate):
     template_name = "password_reset.html"
     template_name_plain = "password_reset.txt"
-    subject = "Reset Your Password"
+    subject = "Đặt lại mật khẩu của bạn"
 
 # Gửi email đặt lại mật khẩu
 async def send_password_reset_email(email: str, user_id: uuid.UUID) -> None:

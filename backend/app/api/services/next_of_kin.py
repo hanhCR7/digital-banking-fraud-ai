@@ -44,7 +44,7 @@ async def validate_next_of_kin_creation(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "status": "error",
-                "message": "Maximum number of kin (3) already reached.",
+                "message": "Số lượng người thân tối đa (3) đã đạt.",
             },
         )
     # Nếu người thân mới được đánh dấu là primary,
@@ -56,7 +56,7 @@ async def validate_next_of_kin_creation(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "A primary next of kin already exists.",
+                    "message": "Người thân chính đã tồn tại.",
                 },
             )
 
@@ -81,7 +81,7 @@ async def create_next_of_kin(
         await session.commit()
         await session.refresh(next_of_kin)
 
-        logger.info(f"Next of kin created successfully for user: {user_id}")
+        logger.info(f"Người thân đã được tạo thành công cho người dùng: {user_id}")
 
         return NextOfKinReadSchema.model_validate(next_of_kin)
 
@@ -89,10 +89,10 @@ async def create_next_of_kin(
         raise http_ex
 
     except Exception as e:
-        logger.error(f"Failed to create next of kin: {str(e)}")
+        logger.error(f"Không thể tạo người thân: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to create next of kin"},
+            detail={"status": "error", "message": "Không thể tạo người thân"},
         )
 
 
@@ -107,10 +107,10 @@ async def get_user_next_of_kins(
         next_of_kins = list(result.all())
         return next_of_kins
     except Exception as e:
-        logger.error(f"Failed to retrieve next of kins: {str(e)}")
+        logger.error(f"Không thể lấy danh sách người thân: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to get user next of kins"},
+            detail={"status": "error", "message": "Không thể lấy danh sách người thân"},
         )
 
 
@@ -129,7 +129,7 @@ async def get_user_next_of_kin(
     if not next_of_kin:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"status": "error", "message": "Next of kin not found"},
+            detail={"status": "error", "message": "Người thân không tìm thấy"},
         )
     return next_of_kin
 
@@ -160,7 +160,7 @@ async def update_next_of_kin(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail={
                             "status": "error",
-                            "message": "Cannot unset primary next of kin when there is only one",
+                            "message": "Không thể bỏ primary nếu chỉ còn 1 người thân",
                         },
                     )
         # Cập nhật các trường thông tin khác
@@ -173,7 +173,7 @@ async def update_next_of_kin(
         await session.commit()
         await session.refresh(next_of_kin)
 
-        logger.info(f"Updated next of kin: {next_of_kin_id} for user: {user_id}")
+        logger.info(f"Người thân đã được cập nhật: {next_of_kin_id} cho người dùng: {user_id}")
 
         return next_of_kin
 
@@ -181,10 +181,10 @@ async def update_next_of_kin(
         raise http_ex
 
     except Exception as e:
-        logger.error(f"Failed to update next of kin: {str(e)}")
+        logger.error(f"Không thể cập nhật người thân: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to update next of kin"},
+            detail={"status": "error", "message": "Không thể cập nhật người thân"},
         )
 
 
@@ -200,22 +200,22 @@ async def delete_next_of_kin(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Cannot delete the only next of kin",
-                    "action": "At least one next of kin must be maintained",
+                    "message": "Không thể xoá người thân cuối cùng.",
+                    "action": "Phải duy trì ít nhất một người thân liên hệ.",
                 },
             )
         # Lấy người thân để xoá, đảm bảo thuộc về user hiện tại
         next_of_kin = await get_user_next_of_kin(user_id, next_of_kin_id, session)
         await session.delete(next_of_kin)
         await session.commit()
-        logger.info(f"Next of kin deleted: {next_of_kin_id} for user: {user_id}")
-        return {"status": "success", "message": "Next of kin deleted successfully"}
+        logger.info(f"Người thân đã được xoá: {next_of_kin_id} cho người dùng: {user_id}")
+        return {"status": "success", "message": "Người thân đã được xoá thành công"}
     except HTTPException as http_ex:
         raise http_ex
 
     except Exception as e:
-        logger.error(f"Failed to delete next of kin: {str(e)}")
+        logger.error(f"Không thể xoá người thân: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to delete next of kin"},
+            detail={"status": "error", "message": "Không thể xoá người thân"},
         )

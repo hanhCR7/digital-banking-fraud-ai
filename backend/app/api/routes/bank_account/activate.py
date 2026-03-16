@@ -5,7 +5,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from backend.app.api.routes.auth.deps import CurrentUser
 from backend.app.api.services.bank_account import activate_bank_account
-from backend.app.auth.schema import RoleChoicesSchema
+from backend.app.api.services.security import require_permission
+from backend.app.permission.schema import PermissionChoicesSchema
 from backend.app.bank_account.schema import BankAccountReadSchema
 from backend.app.core.db import get_session
 from backend.app.core.logging import get_logger
@@ -22,26 +23,16 @@ router = APIRouter(prefix="/bank-account", tags=["Bank Account"])
     "/{account_id}/activate",
     response_model=BankAccountReadSchema,
     status_code=status.HTTP_200_OK,
-    description="Activate a bank account after KYC verification. "
-    "Only accessible to account executives",
+    description="Kích hoạt tài khoản ngân hàng sau khi hoàn tất xác minh KYC. "
+    "Chỉ dành cho: Nhân viên phụ trách tài khoản (Account Executive).",
 )
 async def activate_account(
     account_id: UUID,
-    current_user: CurrentUser,
+    current_user = Depends(require_permission(PermissionChoicesSchema.ACTIVATE_ACCOUNT)),
     session: AsyncSession = Depends(get_session),
 ) -> BankAccountReadSchema:
     """API kích hoạt tài khoản ngân hàng sau khi đã xác minh KYC."""
     try:
-        # Chỉ cho phép account executive kích hoạt tài khoản
-        if not current_user.role == RoleChoicesSchema.ACCOUNT_EXECUTIVE:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={
-                    "status": "error",
-                    "message": "Only account executives can activate bank accounts",
-                },
-            )
-
         activated_account, account_owner = await activate_bank_account(
             account_id=account_id, verified_by=current_user.id, session=session
         )
@@ -49,7 +40,7 @@ async def activate_account(
             if not activated_account.account_number:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail={"status": "error", "message": "Account number not found"},
+                    detail={"status": "error", "message": "Không tìm thấy số tài khoản"},
                 )
             await send_account_activated_email(
                 email=account_owner.email,
@@ -59,12 +50,12 @@ async def activate_account(
                 account_type=activated_account.account_type.value,
                 currency=activated_account.currency.value,
             )
-            logger.info(f"Bank Account activated email sent to {account_owner.email}")
+            logger.info(f"Email thông báo kích hoạt tài khoản ngân hàng đã được gửi tới {account_owner.email}")
         except Exception as email_error:
-            logger.error(f"Failed to send bank account activated email: {email_error}")
+            logger.error(f"Gửi email thông báo kích hoạt tài khoản ngân hàng thất bại: {email_error}")
 
         logger.info(
-            f"Bank account {account_id} activated by account executinve {current_user.email}"
+            f"Tài khoản ngân hàng {account_id} đã được kích hoạt bởi nhân viên phụ trách tài khoản {current_user.email}"
         )
 
         return BankAccountReadSchema.model_validate(activated_account)
@@ -73,8 +64,8 @@ async def activate_account(
         raise http_ex
 
     except Exception as e:
-        logger.error(f"Failed to activate bank account: {e}")
+        logger.error(f"Kích hoạt tài khoản ngân hàng thất bại: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to activate bank account"},
+            detail={"status": "error", "message": "Kích hoạt tài khoản ngân hàng thất bại"},
         )

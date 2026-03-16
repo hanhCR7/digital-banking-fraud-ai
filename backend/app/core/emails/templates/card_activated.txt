@@ -1,27 +1,28 @@
 {% extends "base.txt" %}
 
-{% block header %} Your Virtual Card is Now Active {% endblock %}
+{% block header %} Thẻ ảo của bạn hiện đã được kích hoạt {% endblock %}
 
 {% block content %}
 
-Dear {{full_name}},
+Kính gửi {{ full_name }},
 
-Great news!. Your virtual card has been activated and is now ready for use.:
+Tin vui! Thẻ ảo của bạn đã được kích hoạt và hiện đã sẵn sàng để sử dụng.
   
-  Card Type: {{ card_type }}
-  Card Number: {{ masked_card_number }}
+  Loại thẻ: {{ card_type }}
+  Số thẻ: {{ masked_card_number }}
   CVV: {{ cvv }}
-  Expiry_date: {{ expiry_date }}
+  Ngày hết hạn: {{ expiry_date }}
 
-  Daily Limit: {{ currency }} {{ daily_limit }}
-  Monthly Limit: {{ currency }} {{ monthly_limit }}
+  Hạn mức theo ngày: {{ currency }} {{ daily_limit }}
+  Hạn mức theo tháng: {{ currency }} {{ monthly_limit }}
 
-Your card is now ready for use! You can:
-Make online purchases
-Top up your card balance
-Track your spending through your account
-Manage your card settings and limits
+Thẻ của bạn hiện đã sẵn sàng để sử dụng! Bạn có thể:
+Thực hiện các giao dịch mua sắm trực tuyến
+Nạp tiền vào số dư thẻ
+Theo dõi chi tiêu thông qua tài khoản của bạn
+Quản lý cài đặt và hạn mức thẻ
 
-Security Tip: Please store your CVV securely and never share it with anyone.
-    This is the only time we will show your complete card details in an email
+Lưu ý bảo mật: Vui lòng bảo mật mã CVV và không chia sẻ với bất kỳ ai.
+Đây là lần duy nhất chúng tôi hiển thị đầy đủ thông tin thẻ của bạn trong email.
+
 {% endblock %}

@@ -1,6 +1,7 @@
+from datetime import datetime
 from enum import Enum
 import uuid
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, Column, String
 from pydantic import EmailStr, field_validator
 from fastapi import HTTPException, status
 
@@ -26,28 +27,21 @@ class AccountStatusSchema(str, Enum):
     LOCKED = "locked"
     PENDING = "pending"
 
-# định nghĩa vai trò (role) của người dùng trong hệ thống
-class RoleChoicesSchema(str, Enum):
-    CUSTOMER = "customer" # khách hàng
-    ACCOUNT_EXECUTIVE = "account_executive"# Nhân viên chăm sóc khách hàng
-    BRANCH_MANAGER = "branch_manager"# Quản lý chi nhánh
-    ADMIN = "admin"# QTV
-    SUPER_ADMIN = "super_admin"# QTV cấp cao
-    TELLER = "teller"# giao dịch viên
+
 
 class BaseUserSchema(SQLModel):
     username: str | None = Field(default=None, max_length=12, unique=True)
-    email: EmailStr = Field(unique=True, index=True, max_length=255)
+    email: EmailStr = Field(sa_column=Column(String(255), unique=True, index=True))
     first_name: str = Field(max_length=30)
     middle_name: str | None = Field(max_length=30, default=None)
     last_name: str = Field(max_length=30)
-    id_no: int = Field(unique=True, gt=0)# Số giấy tờ tùy thân (CCCD/CMND)
+    id_no: str = Field(unique=True, min_length=9, max_length=50)# Số giấy tờ tùy thân (CCCD/CMND)
     is_active: bool = False
     is_superuser: bool = False
     security_question: SecurityQuestionsSchema = Field(max_length=30)
     security_answer: str = Field(max_length=30)
     account_status: AccountStatusSchema = Field(default=AccountStatusSchema.INACTIVE)
-    role: RoleChoicesSchema = Field(default=RoleChoicesSchema.CUSTOMER)
+
 
 class UserCreateSchema(BaseUserSchema):
     password: str = Field(min_length=8, max_length=40)
@@ -87,26 +81,91 @@ class OTPVerifyRequestSchema(SQLModel):
         max_length=6
     )
 
+# Schema thay đổi mật khẩu
+class ChangePasswordSchema(SQLModel):
+    current_password: str = Field(..., min_length=8, max_length=40)
+    new_password: str = Field(..., min_length=8, max_length=40)
+    confirm_password: str = Field(..., min_length=8, max_length=40)
+    # Xác minh mật khẩu mới và xác nhận mật khẩu có khớp nhau không
+    @field_validator("confirm_password")
+    def validate_password_match(cls, v, values):
+        if "new_password" in values.data and v != values.data["new_password"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "status": "error",
+                    "message": "Xác nhận mật khẩu không hợp lệ.",
+                    "action": "Mật khẩu và mật khẩu xác nhận phải giống nhau.",
+                },
+            )
+        return v
+
+class ChangeInitialPasswordSchema(SQLModel):
+    user_id: uuid.UUID
+    new_password: str = Field(..., min_length=8, max_length=40)
+    confirm_password: str = Field(..., min_length=8, max_length=40)
+    # Xác minh mật khẩu mới và xác nhận mật khẩu có khớp nhau không
+    @field_validator("confirm_password")
+    def validate_password_match(cls, v, values):
+        if "new_password" in values.data and v != values.data["new_password"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "status": "error",
+                    "message": "Xác nhận mật khẩu không hợp lệ.",
+                    "action": "Mật khẩu và mật khẩu xác nhận phải giống nhau.",
+                },
+            )
+        return v
 # Schema yêu cầu đặt lại mật khẩu
 class PasswordResetRequestSchema(SQLModel):
     email: EmailStr
 
 # Schema xác nhận đặt lại mật khẩu
 class PasswordResetConfirmSchema(SQLModel):
-    new_password: str = Field(
-        ...,
-        min_length=8,
-        max_length=40,
-    )
-    confirm_password: str = Field(
-        ...,
-        min_length=8,
-        max_length=40,
-    )
+    new_password: str = Field(..., min_length=8, max_length=40)
+    confirm_password: str = Field(..., min_length=8, max_length=40)
     # Xác minh mật khẩu mới và xác nhận mật khẩu có khớp nhau không
     @field_validator("confirm_password")
     def validate_password_match(cls, v, values):
         if "new_password" in values.data and v != values.data["new_password"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "status": "error",
+                    "message": "Xác nhận mật khẩu không hợp lệ.",
+                    "action": "Mật khẩu và mật khẩu xác nhận phải giống nhau."
+                },
+            )
+        return v
+class PaginatedUserResponseSchema(SQLModel):
+    total: int
+    page: int
+    size: int
+    users: list[UserReadSchema]
+
+class AdminUserCreateSchema(BaseUserSchema):
+    is_active: bool = Field(default=True)
+    password: str = Field(..., min_length=8, max_length=40)
+    confirm_password: str = Field(..., min_length=8, max_length=40)
+    @field_validator("confirm_password")
+    def validate_passwords_match(cls, v, values):
+        if "password" in values.data and v != values.data["password"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "status": "error",
+                    "message": "Passwords do not match",
+                    "action": "Please ensure that the passwords you entered match",
+                },
+            )
+        return v  
+class AdminUserUpdateSchema(BaseUserSchema):
+    password: str | None = Field(default=None, min_length=8, max_length=40)
+    confirm_password: str | None = Field(default=None, min_length=8, max_length=40)
+    @field_validator("confirm_password")
+    def validate_passwords_match(cls, v, values):
+        if "password" in values.data and v != values.data["password"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
@@ -116,3 +175,26 @@ class PasswordResetConfirmSchema(SQLModel):
                 },
             )
         return v
+class AdminUserResponse(SQLModel):
+    id: uuid.UUID
+    email: EmailStr
+    full_name: str
+    first_name: str | None
+    middle_name: str | None
+    last_name: str | None
+
+    is_active: bool
+    account_status: AccountStatusSchema
+
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: datetime | None
+
+
+class AdminUserListResponse(SQLModel):
+    """Response cho GET /admin/users — danh sách user với key 'Danh sách User'."""
+
+    class Config:
+        populate_by_name = True
+
+    danh_sach_user: list[AdminUserResponse] = Field(alias="Danh sách User")

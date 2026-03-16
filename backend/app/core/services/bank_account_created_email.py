@@ -5,7 +5,7 @@ from backend.app.core.emails.base import EmailTemplate
 class AccountCreatedEmail(EmailTemplate):
     template_name = "account_created.html"
     template_name_plain = "account_created.txt"
-    subject = "Welcome - Your Bank Account Has been Created"
+    subject = "Chào mừng – Tài khoản ngân hàng của bạn đã được tạo"
 
 
 async def send_account_created_email(
@@ -15,7 +15,7 @@ async def send_account_created_email(
     account_name: str,
     account_type: str,
     currency: str,
-    identification_type: str,
+    identification_type: str, # Loại giấy tờ tùy thân (ví dụ: CMND, Hộ chiếu)
 ) -> None:
     context = {
         "full_name": full_name,

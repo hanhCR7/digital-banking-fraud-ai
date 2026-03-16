@@ -15,6 +15,9 @@ class Setting(BaseSettings):
     PROJECT_DESCRIPTION: str = ""
     SITE_NAME: str = ""
     DATABASE_URL: str = ""
+    # Admin initial account
+    INITIAL_ADMIN_EMAIL: str = ""
+    INITIAL_ADMIN_PASSWORD: str = ""
     # mail settings
     MAIL_FROM: str = ""
     MAIL_FROM_NAME: str = ""
@@ -74,11 +77,12 @@ class Setting(BaseSettings):
     # CẤU HÌNH NGÂN HÀNG
     BANK_CODE: str = ""
     BANK_BRANCH_CODE: str = ""
-    CURRENCY_CODE_USD: str = "01"
-    CURRENCY_CODE_EUR: str = "02"
-    CURRENCY_CODE_GBP: str = "03"
-    CURRENCY_CODE_KES: str = "04"
+    CURRENCY_CODE_VND: str = "01"
     MAX_BANK_ACCOUNTS: int = 3 # Số tài khoản ngân hàng tối đa cho mỗi người dùng
+    # Giới hạn mức tối thiểu để nạp tiền vào thẻ ảo
+    MIN_TOPUP_AMOUNT: float = 10000
+    # Giới hạn số tiền tối thiểu trong 1 giao dịch 
+    MIN_TRANSACTION_AMOUNT: float = 1000
 settings = Setting()
 # Cấu hình Cloudinary khi khởi động ứng dụng
 cloudinary.config(

@@ -8,7 +8,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from backend.app.auth.models import User
-from backend.app.auth.schema import RoleChoicesSchema
+from backend.app.core.config import settings
 from backend.app.bank_account.enums import AccountStatusEnum
 from backend.app.bank_account.models import BankAccount
 from backend.app.core.logging import get_logger
@@ -51,7 +51,7 @@ async def create_virtual_card(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "status": "error",
-                    "message": "Bank account not found or does not belong to the user",
+                    "message": "Tài khoản ngân hàng không tìm thấy hoặc không thuộc người dùng",
                 },
             )
 
@@ -61,7 +61,7 @@ async def create_virtual_card(
         if bank_account.account_status != AccountStatusEnum.Active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"status": "error", "message": "Bank account is not active"},
+                detail={"status": "error", "message": "Tài khoản ngân hàng không hoạt động"},
             )
 
         # Kiểm tra tiền tệ của thẻ phải trùng với tài khoản ngân hàng
@@ -71,7 +71,7 @@ async def create_virtual_card(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Card currency must match the bank account currency",
+                    "message": "Tiền tệ của thẻ phải trùng với tài khoản ngân hàng",
                 },
             )
 
@@ -123,10 +123,10 @@ async def create_virtual_card(
     except Exception as e:
         # Rollback và log lỗi hệ thống
         await session.rollback()
-        logger.error(f"Failed to create virtual card: {e}")
+        logger.error(f"Không thể tạo thẻ: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to create virtual card"},
+            detail={"status": "error", "message": "Không thể tạo thẻ"},
         )
 
 
@@ -152,7 +152,7 @@ async def block_virtual_card(
         if not card_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"status": "error", "message": "Virtual card not found"},
+                detail={"status": "error", "message": "Thẻ không tìm thấy"},
             )
 
         card, card_owner = card_data
@@ -161,7 +161,7 @@ async def block_virtual_card(
         if card.card_status == VirtualCardStatusEnum.Blocked:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"status": "error", "message": "Card is already blocked"},
+                detail={"status": "error", "message": "Thẻ đã bị khóa"},
             )
 
         # Cập nhật trạng thái khóa thẻ
@@ -195,10 +195,10 @@ async def block_virtual_card(
         raise
     except Exception as e:
         await session.rollback()
-        logger.error(f"Failed to block virtual card: {e}")
+        logger.error(f"Không thể khóa thẻ: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to block virtual card"},
+            detail={"status": "error", "message": "Không thể khóa thẻ"},
         )
 
 
@@ -231,7 +231,7 @@ async def top_up_virtual_card(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "status": "error",
-                    "message": "Virtual card or bank account not found",
+                    "message": "Thẻ hoặc tài khoản ngân hàng không tìm thấy",
                 },
             )
 
@@ -241,13 +241,13 @@ async def top_up_virtual_card(
         if card.card_status != VirtualCardStatusEnum.Active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"status": "error", "message": "Card is not active"},
+                detail={"status": "error", "message": "Thẻ không hoạt động"},
             )
 
         if bank_account.account_status != AccountStatusEnum.Active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"status": "error", "message": "Bank account is not active"},
+                detail={"status": "error", "message": "Tài khoản ngân hàng không hoạt động"},
             )
 
         # Kiểm tra số dư
@@ -256,7 +256,7 @@ async def top_up_virtual_card(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Insufficient balance in bank account",
+                    "message": "Số dư trong tài khoản không đủ",
                 },
             )
 
@@ -266,7 +266,16 @@ async def top_up_virtual_card(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Currency mismatch between card and bank account",
+                    "message": "Tiền tệ của thẻ phải trùng với tài khoản ngân hàng",
+                },
+            )
+        formatted_amount = f"{settings.MIN_TOPUP_AMOUNT:,.0f}"
+        if Decimal(str(amount)) <= Decimal(str(settings.MIN_TOPUP_AMOUNT)):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "status": "error",
+                    "message": f"Số tiền nạp phải lớn hơn {formatted_amount} VNĐ",
                 },
             )
 
@@ -299,7 +308,7 @@ async def top_up_virtual_card(
         )
 
         # Cập nhật số dư
-        bank_account.balance = float(balance_after)
+        bank_account.balance = balance_after
         card.available_balance += amount
         card.total_topped_up += amount
         card.last_top_up_date = current_time
@@ -319,10 +328,10 @@ async def top_up_virtual_card(
         raise
     except Exception as e:
         await session.rollback()
-        logger.error(f"Failed to top up virtual card: {e}")
+        logger.error(f"Không thể nạp tiền vào thẻ: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to process card top-up"},
+            detail={"status": "error", "message": "Không thể nạp tiền vào thẻ"},
         )
 
 
@@ -348,27 +357,16 @@ async def activate_virtual_card(
         if not card_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"status": "error", "message": "Virtual card not found"},
+                detail={"status": "error", "message": "Thẻ không tìm thấy"},
             )
 
         card, bank_account, card_owner = card_data
-
-        # Kiểm tra quyền kích hoạt
-        executive = await session.get(User, activated_by)
-        if not executive or executive.role != RoleChoicesSchema.ACCOUNT_EXECUTIVE:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={
-                    "status": "error",
-                    "message": "Only account executives can activate virtual cards",
-                },
-            )
 
         # Không cho phép kích hoạt thẻ đã active
         if card.card_status == VirtualCardStatusEnum.Active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"status": "error", "message": "Card is already active"},
+                detail={"status": "error", "message": "Thẻ đã được kích hoạt"},
             )
 
         # Sinh CVV mới khi kích hoạt
@@ -399,10 +397,10 @@ async def activate_virtual_card(
         raise
     except Exception as e:
         await session.rollback()
-        logger.error(f"Failed to activate virtual card: {e}")
+        logger.error(f"Không thể kích hoạt thẻ: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to activate virtual card"},
+            detail={"status": "error", "message": "Không thể kích hoạt thẻ"},
         )
 
 
@@ -427,7 +425,7 @@ async def delete_virtual_card(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "status": "error",
-                    "message": "Virtual card not found or does not belong to the user",
+                    "message": "Thẻ không tìm thấy hoặc không thuộc người dùng",
                 },
             )
 
@@ -439,7 +437,7 @@ async def delete_virtual_card(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Cannot delete card with physical card request",
+                    "message": "Không thể xóa thẻ nếu đã yêu cầu thẻ vật lý",
                 },
             )
 
@@ -449,8 +447,8 @@ async def delete_virtual_card(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Cannot delete card with remaining balance",
-                    "action": "Please withdraw remaining balance first",
+                    "message": "Không thể xóa thẻ nếu còn số dư",
+                    "action": "Vui lòng rút số dư trước",
                 },
             )
 
@@ -475,11 +473,11 @@ async def delete_virtual_card(
         await session.commit()
         await session.refresh(card)
 
-        logger.info(f"Virtual card {card_id} soft deleted successfully")
+        logger.info(f"Thẻ {card_id} đã được xóa")
 
         return {
             "status": "success",
-            "message": "Virtual card deleted successfully",
+            "message": "Thẻ đã được xóa",
             "deleted_at": deletion_time,
         }
 
@@ -488,8 +486,8 @@ async def delete_virtual_card(
         raise
     except Exception as e:
         await session.rollback()
-        logger.error(f"Failed to delete virtual card: {e}")
+        logger.error(f"Không thể xóa thẻ: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to delete virtual card"},
+            detail={"status": "error", "message": "Không thể xóa thẻ"},
         )

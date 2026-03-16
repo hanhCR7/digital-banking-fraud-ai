@@ -9,6 +9,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from backend.app.bank_account.models import BankAccount
+from backend.app.core.ai.enums import AIReviewStatusEnum  # FIX: import enum để so sánh đúng
 from backend.app.core.ai.models import TransactionRiskScore
 from backend.app.core.logging import get_logger
 from backend.app.transaction.models import Transaction
@@ -20,7 +21,7 @@ class FeatureExtractor:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.feature_names = []
-    
+
     def _extract_time_features(self, transaction: Transaction) -> dict[str, Any]:
         """
         Trích xuất các đặc trưng thời gian của giao dịch để phục vụ phân tích rủi ro.
@@ -31,15 +32,15 @@ class FeatureExtractor:
         created_at = transaction.created_at
 
         is_banking_hours = 1 if 9 <= created_at.hour <= 17 else 0
-        is_late_night = 1 if created_at.hour <= 5 or created_at.hour >= 23 else 0 # Đêm khuya
+        is_late_night = 1 if created_at.hour <= 5 or created_at.hour >= 23 else 0  # Đêm khuya
 
         month = created_at.month
         day = created_at.day
         day_of_week = created_at.weekday()
-        is_weekend = 1 if day_of_week >= 5 else 0 # Cuối tuần
+        is_weekend = 1 if day_of_week >= 5 else 0  # Cuối tuần
 
-        is_month_end = 1 if day >= 25 else 0 # Đầu tháng
-        is_month_start = 1 if day <= 5 else 0 # Cuối tháng
+        is_month_end = 1 if day >= 25 else 0    # FIX comment: Cuối tháng
+        is_month_start = 1 if day <= 5 else 0   # FIX comment: Đầu tháng
 
         return {
             "hour_of_day": created_at.hour,
@@ -52,6 +53,7 @@ class FeatureExtractor:
             "is_month_end": is_month_end,
             "is_month_start": is_month_start,
         }
+
     def _extract_metadata_features(self, metadata: dict[str, Any]) -> dict[str, Any]:
         """
         Trích xuất các đặc trưng từ metadata của giao dịch.
@@ -101,6 +103,7 @@ class FeatureExtractor:
             features["is_currency_conversion"] = 0
 
         return features
+
     async def _extract_account_features(
         self, account_id: UUID, is_sender: bool
     ) -> dict[str, Any]:
@@ -157,7 +160,7 @@ class FeatureExtractor:
             features[f"{prefix}_avg_transaction_amount"] = np.mean(amounts)
             # Nếu tài khoản có nhiều hơn một giao dịch, tính các thống kê để đo mức độ biến động số tiền
             if len(transactions) > 1:
-                features[f"{prefix}_std_transaction_amount"] = float(np.std(amounts))# độ lệch chuẩn
+                features[f"{prefix}_std_transaction_amount"] = float(np.std(amounts))  # Độ lệch chuẩn
                 features[f"{prefix}_max_transaction_amount"] = float(np.max(amounts))
                 features[f"{prefix}_min_transaction_amount"] = float(np.min(amounts))
             else:
@@ -167,6 +170,7 @@ class FeatureExtractor:
                 features[f"{prefix}_min_transaction_amount"] = amounts[0]
 
         return features
+
     async def _extract_user_history_features(
         self,
         user_id: UUID,
@@ -226,6 +230,7 @@ class FeatureExtractor:
             features[f"user_tx_type_{tx_type}_ratio"] = count / len(transactions)
 
         return features
+
     async def _extract_velocity_features(
         self,
         user_id: UUID,
@@ -282,6 +287,7 @@ class FeatureExtractor:
                 features[f"tx_avg_amount_{window_name}"] = 0
 
         return features
+
     async def extract_features_for_transaction(
         self,
         transaction: Transaction,
@@ -303,9 +309,9 @@ class FeatureExtractor:
         try:
             # Feature cơ bản trực tiếp từ giao dịch
             features: dict[str, Any] = {
-                "amount": float(transaction.amount),  # Số tiền giao dịch
-                "transaction_type": transaction.transaction_type.value,  # Loại giao dịch
-                "transaction_category": transaction.transaction_category.value,  # Nhóm giao dịch
+                "amount": float(transaction.amount),                              # Số tiền giao dịch
+                "transaction_type": transaction.transaction_type.value,           # Loại giao dịch
+                "transaction_category": transaction.transaction_category.value,   # Nhóm giao dịch
             }
 
             # One-hot encoding cho loại và nhóm giao dịch
@@ -399,6 +405,7 @@ class FeatureExtractor:
                 "error_in_feature_extraction": 1,
             }
 
+
 async def prepare_training_dataset(
     session: AsyncSession,
     start_date: datetime,
@@ -467,7 +474,7 @@ async def prepare_training_dataset(
                 is_fraud = 1
 
         # Trường hợp 2: trạng thái AI review đã xác nhận gian lận
-        if tx.ai_review_status and tx.ai_review_status == "CONFIRMED_FRAUD":
+        if tx.ai_review_status == AIReviewStatusEnum.CONFIRMED_FRAUD:
             is_fraud = 1
 
         # Trường hợp 3: kiểm tra bảng risk score đã confirm fraud
@@ -582,6 +589,3 @@ async def prepare_training_dataset(
     )
 
     return df
-
-
-

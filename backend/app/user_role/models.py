@@ -1,9 +1,12 @@
 from datetime import datetime
 import uuid
+from typing import TYPE_CHECKING
 from sqlmodel import SQLModel, Field, ForeignKey, Column, String, Relationship
 from sqlalchemy.dialects.postgresql import UUID
-from backend.app.auth.models import User
-from backend.app.role.models import Role
+
+if TYPE_CHECKING:
+    from backend.app.auth.models import User
+    from backend.app.role.models import Role
 
 class UserRole(SQLModel, table=True):
 

@@ -59,14 +59,14 @@ async def create_bank_account(
         # Kiểm tra user tồn tại
         statement = select(User).where(User.id == user_id)
         result = await session.exec(statement)
-        user = result.first()
+        user = result.first()# Lấy user đầu tiên (nếu có) từ kết quả truy vấn
 
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"status": "error", "message": "User not found"},
+                detail={"status": "error", "message": "Người dùng không tìm thấy"},
             )
-         # Load các quan hệ cần thiết cho kiểm tra KYC
+        # Load các quan hệ cần thiết cho kiểm tra KYC
         await session.refresh(user, ["profile", "next_of_kins"])
         # Kiểm tra điều kiện KYC
         if not await validate_user_kyc(user):
@@ -74,8 +74,8 @@ async def create_bank_account(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "KYC requirements not met",
-                    "action": "Please complete your profile and add at least one next of kin",
+                    "message": "Yêu cầu KYC chưa được đáp ứng",
+                    "action": "Vui lòng hoàn tất hồ sơ cá nhân và thêm ít nhất một người thân",
                 },
             )
         # Lấy danh sách tài khoản hiện có
@@ -88,23 +88,24 @@ async def create_bank_account(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Maximum number of accounts reached",
+                    "message": "Đã đạt đến số lượng tài khoản tối đa.",
                 },
             )
            # Xử lý logic tài khoản chính
         if account_data.is_primary:
+            # Kiểm tra nếu đã có tài khoản chính nào tồn tại trong danh sách tài khoản hiện có
             primary_exists = any(account.is_primary for account in existing_accounts)
-
+            
             if primary_exists:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail={
                         "status": "error",
-                        "message": "A primary account already exists",
-                        "action": "Please unset the existing primary account first",
+                        "message": "Tài khoản chính đã tồn tại",
+                        "action": "Vui lòng hủy thiết lập tài khoản chính hiện tại trước",
                     },
                 )
-        # Nếu là tài khoản đầu tiên → tự động set primary
+        # Nếu là tài khoản đầu tiên -> tự động set primary
         elif len(existing_accounts) == 0:
             account_data.is_primary = True
         # Sinh số tài khoản tự động theo currency
@@ -128,10 +129,10 @@ async def create_bank_account(
 
     except Exception as e:
         await session.rollback()
-        logger.error(f"Failed to create account: {str(e)}")
+        logger.error(f"Không thể tạo tài khoản: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to create account"},
+            detail={"status": "error", "message": "Không thể tạo tài khoản"},
         )
 
 
@@ -160,7 +161,7 @@ async def activate_bank_account(
         if not account_user_tuple:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"status": "error", "message": "Bank account not found"},
+                detail={"status": "error", "message": "Tài khoản ngân hàng không tìm thấy"},
             )
 
         account, user = account_user_tuple
@@ -169,7 +170,7 @@ async def activate_bank_account(
         if account.account_status == AccountStatusEnum.Active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"status": "error", "message": "Account is already activated"},
+                detail={"status": "error", "message": "Tài khoản đã được kích hoạt"},
             )
 
         # Cập nhật trạng thái KYC và kích hoạt tài khoản
@@ -190,8 +191,9 @@ async def activate_bank_account(
         raise http_ex
     except Exception as e:
         await session.rollback()
-        logger.error(f"Failed to activate bank account: {e}")
+        logger.error(f"Không thể kích hoạt tài khoản: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to activate bank account"},
+            detail={"status": "error", "message": "Không thể kích hoạt tài khoản"},
         )
+

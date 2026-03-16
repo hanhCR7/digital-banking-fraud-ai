@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "8ad80bdef945f09e51b75a11e2a405ec24816f44e46efe845c81a966620c8ef8"
+            "sha256": "ed130f429266d16ef7a4a96025b5d12ce197bac41c32edbc7f18fb7daa246667"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -653,6 +653,14 @@
             "index": "pypi",
             "markers": "python_version >= '3.8'",
             "version": "==2.2.0"
+        },
+        "et-xmlfile": {
+            "hashes": [
+                "sha256:7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa",
+                "sha256:dab3f4764309081ce75662649be815c4c9081e88f0837825f90fd28317d4da54"
+            ],
+            "markers": "python_version >= '3.8'",
+            "version": "==2.0.0"
         },
         "fastapi": {
             "extras": [
@@ -1589,6 +1597,15 @@
             "index": "pypi",
             "markers": "python_version >= '3.10'",
             "version": "==2.2.3"
+        },
+        "openpyxl": {
+            "hashes": [
+                "sha256:5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2",
+                "sha256:cf0e3cf56142039133628b5acffe8ef0c12bc902d2aadd3e0fe5878dc08d1050"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.8'",
+            "version": "==3.1.5"
         },
         "opentelemetry-api": {
             "hashes": [

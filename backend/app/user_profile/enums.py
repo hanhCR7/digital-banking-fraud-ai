@@ -17,26 +17,26 @@ class GenderEnum(str, Enum):
 
 class MaritalStatusEnum(str, Enum):
     # Tình trạng hôn nhân
-    Married = "Married"
-    Divorced = "Divorced"
-    Single = "Single"
-    Widowed = "Widowed"
+    Married = "Married"# Đã kết hôn
+    Divorced = "Divorced"# Đã ly hôn
+    Single = "Single"# Độc thân
+    Widowed = "Widowed"# Góa phụ
 
 
 class IdentificationTypeEnum(str, Enum):
     # Nhận dạng các loại giấy tờ
-    Passport = "Passport"
-    Drivers_License = "Drivers_License"
-    National_ID = "National_ID"
+    Passport = "Passport"# Hộ chiếu
+    Drivers_License = "Drivers_License"# Giấy phép lái xe
+    National_ID = "National_ID"# Chứng minh nhân dân
 
 
 class EmploymentStatusEnum(str, Enum):
     # Tình trạng việc làm
-    Employed = "Employed"
-    Unemployed = "Unemployed"
-    Self_Employed = "Self_Employed"
-    Student = "Student"
-    Retired = "Retired"
+    Employed = "Employed" # Đang làm việc
+    Unemployed = "Unemployed"# Không có việc làm
+    Self_Employed = "Self_Employed"# Tự kinh doanh
+    Student = "Student"# Sinh viên
+    Retired = "Retired"# Đã nghỉ hưu
 
 
 class ImageTypeEnum(str, Enum):

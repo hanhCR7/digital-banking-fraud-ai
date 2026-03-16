@@ -11,7 +11,7 @@ from backend.app.core.services.activation_email import send_activation_email
 
 logger = get_logger()
 
-router = APIRouter(prefix="/auth", tags=["Athentication"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.get("/activate/{token}", status_code=status.HTTP_200_OK)
@@ -21,51 +21,51 @@ async def activate_user(
 ):
     try:
         user = await user_auth_service.activate_user_account(token, session)
-        return {"message": "Account activated successfully", "email": user.email}
+        return {"message": "Tài khoản đã được kích hoạt thành công!", "email": user.email}
     except ValueError as e:
         error_msg = str(e)
         # Nếu mã token hết hạn
-        if error_msg == "Activation token expired":
+        if error_msg == "Mã kích hoạt đã hết hạn":
             raise HTTPException(
                 status_code=status.HTTP_410_GONE,
                 detail={
                     "status": "error",
-                    "message": "Activation link has expired",
-                    "action": "Please request a new activation link",
+                    "message": "Liên kết kích hoạt đã hết hạn.",
+                    "action": "Vui lòng yêu cầu gửi lại liên kết kích hoạt mới.",
                     "action_url": f"{settings.API_BASE_URL}{settings.API_V1_STR}/auth/resend-activation-link",
                     "email_required": True,
                 },
             )
         # Mã token không hợp lệ
-        elif error_msg == "Invalid activation token":
+        elif error_msg == "Mã kích hoạt không hợp lệ":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Invalid activation token",
-                    "action": "Please confirm that the link you clicked on is correct",
+                    "message": "Mã kích hoạt không hợp lệ.",
+                    "action": "Vui lòng kiểm tra lại liên kết bạn đã nhấp có chính xác hay không.",
                 },
             )
         # User đã được kích hoạt
-        elif error_msg == "User already activated":
+        elif error_msg == "Tài khoản người dùng đã được kích hoạt":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "User already activated",
-                    "action": "Please login to your account",
+                    "message": "Tài khoản người dùng đã được kích hoạt.",
+                    "action": "Vui lòng đăng nhập vào tài khoản của bạn.",
                 },
             )
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
-        logger.error(f"Failed to activate user account: {e}")
+        logger.error(f"Kích hoạt tài khoản người dùng thất bại: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to activate user account",
-                "action": "Please try again later",
+                "message": "Kích hoạt tài khoản người dùng thất bại.",
+                "action": "Vui lòng thử lại sau.",
             },
         )
 
@@ -85,7 +85,7 @@ async def resend_activation_link(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "status": "error",
-                    "message": "If an account exists with this email, please check your inbox for the activation link",
+                    "message": "Nếu tồn tại tài khoản với email này, vui lòng kiểm tra hộp thư để nhận liên kết kích hoạt.",
                 },
             )
         if user.is_active or user.account_status == AccountStatusSchema.ACTIVE:
@@ -93,8 +93,8 @@ async def resend_activation_link(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "User account already activated",
-                    "action": "Please login to your account",
+                    "message": "Tài khoản người dùng đã được kích hoạt.",
+                    "action": "Vui lòng đăng nhập vào tài khoản của bạn.",
                 },
             )
 
@@ -102,17 +102,17 @@ async def resend_activation_link(
         await send_activation_email(user.email, activation_token)
 
         return {
-            "message": "If an account exists with this email, please check your inbox for the activation link"
+            "message": "Nếu tồn tại tài khoản với email này, vui lòng kiểm tra hộp thư để nhận liên kết kích hoạt."
         }
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
-        logger.error(f"Failed to resend activation link: {e}")
+        logger.error(f"Gửi lại liên kết kích hoạt thất bại: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to resend activation link",
-                "action": "Please try again later or contact support if the issue persists",
+                "message": "Gửi lại liên kết kích hoạt thất bại.",
+                "action": "Vui lòng thử lại sau hoặc liên hệ bộ phận hỗ trợ nếu sự cố vẫn tiếp diễn.",
             },
         )

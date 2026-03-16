@@ -5,7 +5,7 @@ from backend.app.core.emails.base import EmailTemplate
 class ActivationEmail(EmailTemplate):
     template_name = "activation.html"
     template_name_plain = "activation.txt"
-    subject = "Activate your Account"
+    subject = "Kích hoạt tài khoản của bạn"
 
 
 async def send_activation_email(email: str, token: str) -> None:

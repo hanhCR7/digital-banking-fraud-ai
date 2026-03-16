@@ -10,8 +10,7 @@ from backend.app.user_profile.models import Profile
 from backend.app.auth.models import User
 from backend.app.user_profile.schema import (
     ProfileCreateSchema,
-    ProfileUpdateSchema,
-    RoleChoicesSchema
+    ProfileUpdateSchema
 )
 
 logger = get_logger()
@@ -24,10 +23,10 @@ async def get_user_profile(user_id: uuid.UUID, session: AsyncSession) -> Profile
         return result.first()
 
     except Exception as e:
-        logger.error(f"Error fetching user profile: {e}")
+        logger.error(f"Lỗi khi lấy thông tin hồ sơ người dùng: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to fetch user profile"},
+            detail={"status": "error", "message": "Lỗi khi lấy thông tin hồ sơ người dùng"},
         )
 
 # Tạo hồ sơ người dùng mới
@@ -42,28 +41,29 @@ async def create_user_profile(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Profile already exists for this user",
+                    "message": "Hồ sơ người dùng đã tồn tại",
                 },
             )
         # Chuyển đổi dữ liệu schema thành dict
         profile_data_dict = profile_data.model_dump()
 
-        profile = Profile(user_id=user_id, **profile_data_dict)
+        profile = Profile(**profile_data_dict)
+        profile.user_id = user_id
         session.add(profile)
 
         await session.commit()
         await session.refresh(profile)
 
-        logger.info(f"Created profile for user {user_id}")
+        logger.info(f"Hồ sơ người dùng đã được tạo: {user_id}")
         return profile
 
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
-        logger.error(f"Error creating user profile: {str(e)}")
+        logger.error(f"Lỗi khi tạo thông tin hồ sơ người dùng: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to create user profile"},
+            detail={"status": "error", "message": "Lỗi khi tạo thông tin hồ sơ người dùng"},
         )
 # Cập nhật hồ sơ người dùng
 async def update_user_profile(
@@ -77,8 +77,8 @@ async def update_user_profile(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "status": "error",
-                    "message": "Profile not found",
-                    "action": "Please create a profile first",
+                    "message": "Hồ sơ người dùng không tìm thấy",
+                    "action": "Vui lòng tạo hồ sơ người dùng trước",
                 },
             )
         # Cập nhật các trường từ profile_data nếu chúng được cung cấp
@@ -95,16 +95,16 @@ async def update_user_profile(
         await session.commit()
         await session.refresh(profile)
 
-        logger.info(f"Updated profile for user {user_id}")
+        logger.info(f"Hồ sơ người dùng đã được cập nhật: {user_id}")
         return profile
 
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
-        logger.error(f"Error updating user profile: {str(e)}")
+        logger.error(f"Lỗi khi cập nhật thông tin hồ sơ người dùng: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to update user profile"},
+            detail={"status": "error", "message": "Lỗi khi cập nhật thông tin hồ sơ người dùng"},
         )
 
 
@@ -122,10 +122,10 @@ def initiate_image_upload(
         )
         return task.id
     except Exception as e:
-        logger.error(f"Error initiating image upload: {str(e)}", exc_info=True)
+        logger.error(f"Lỗi khi khởi tạo task upload ảnh: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to initiate image upload"},
+            detail={"status": "error", "message": "Lỗi khi khởi tạo task upload ảnh"},
         )
 
 
@@ -145,8 +145,8 @@ async def update_profile_image_url(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "status": "error",
-                    "message": "Profile not found",
-                    "action": "Please create a profile first",
+                    "message": "Hồ sơ người dùng không tìm thấy",
+                    "action": "Vui lòng tạo hồ sơ người dùng trước",
                 },
             )
         # Ánh xạ loại ảnh sang trường tương ứng trong bảng Profile
@@ -171,10 +171,10 @@ async def update_profile_image_url(
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
-        logger.error(f"Error updating profile image url: {str(e)}")
+        logger.error(f"Lỗi khi cập nhật URL ảnh trong hồ sơ người dùng: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to update profile image url"},
+            detail={"status": "error", "message": "Lỗi khi cập nhật URL ảnh trong hồ sơ người dùng"},
         )
 
 
@@ -194,13 +194,13 @@ async def get_user_with_profile(user_id: uuid.UUID, session: AsyncSession) -> Us
         else:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"status": "error", "message": "User not found"},
+                detail={"status": "error", "message": "Người dùng không tìm thấy"},
             )
     except Exception as e:
-        logger.error(f"Error fetching user with profile: {str(e)}")
+        logger.error(f"Lỗi khi lấy thông tin người dùng kèm theo hồ sơ: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to fetch user with profile."},
+            detail={"status": "error", "message": "Lỗi khi lấy thông tin người dùng kèm theo hồ sơ"},
         )
 
 
@@ -212,16 +212,6 @@ async def get_all_user_profiles(
 ) -> tuple[list[User], int]:
     """Lấy danh sách toàn bộ người dùng kèm profile (có phân quyền)."""
     try:
-        # Nếu không phải là quản lý chi nhánh thì không có quyền truy cập
-        if current_user.role != RoleChoicesSchema.BRANCH_MANAGER:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={
-                    "status": "error",
-                    "message": "Access denied",
-                    "action": "Only branch managers can access all profiles",
-                },
-            )
         # Truy vấn tổng số người dùng để phục vụ phân trang
         count_statement = select(User)
         # Thực thi query và lấy tổng số bản ghi
@@ -243,12 +233,12 @@ async def get_all_user_profiles(
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
-        logger.error(f"Error fetching all user profiles: {e}")
+        logger.error(f"Lỗi khi lấy danh sách toàn bộ người dùng kèm profile: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to fetch user profiles",
-                "action": "Please try again later",
+                "message": "Lỗi khi lấy danh sách toàn bộ người dùng kèm profile.",
+                "action": "Vui lòng thử lại sau.",
             },
         )

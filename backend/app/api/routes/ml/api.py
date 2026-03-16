@@ -6,8 +6,8 @@ import mlflow
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from backend.app.api.routes.auth.deps import CurrentUser
-from backend.app.auth.schema import RoleChoicesSchema
+from backend.app.api.services.security import require_role
+from backend.app.role.schema import RoleChoicesSchema
 from backend.app.core.db import get_session
 from backend.app.core.logging import get_logger
 from backend.app.core.ml.config import ml_settings
@@ -30,24 +30,11 @@ logger = get_logger()
 
 router = APIRouter(prefix="/ml", tags=["Machine Learning"])
 
-def admin_required(current_user: CurrentUser):
-    """
-    Dependency kiểm tra quyền truy cập admin
-    Chỉ cho phép SUPER_ADMIN truy cập các API quản trị model
-    """
-    if current_user.role != RoleChoicesSchema.SUPER_ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "status": "error",
-                "message": "Bạn không có quyền truy cập. Chỉ quản trị viên mới được phép."
-            }
-        )
-    return current_user
+
 @router.post(
     "/train/default",
     response_model=TrainingResponse,
-    dependencies=[Depends(admin_required)]
+    dependencies=[Depends(require_role(RoleChoicesSchema.SUPER_ADMIN))]
 )
 async def train_model_with_defaults(
     session: AsyncSession = Depends(get_session)
@@ -79,7 +66,7 @@ async def train_model_with_defaults(
 @router.post(
     "/train",
     response_model=TrainingResponse,
-    dependencies=[Depends(admin_required)]
+    dependencies=[Depends(require_role(RoleChoicesSchema.SUPER_ADMIN))]
 )
 async def train_model(
     request: TrainingRequest,
@@ -138,7 +125,7 @@ async def train_model(
 @router.get(
     "/models",
     response_model=List[ModelResponse],
-    dependencies=[Depends(admin_required)]
+    dependencies=[Depends(require_role(RoleChoicesSchema.SUPER_ADMIN))]
 )
 async def list_models(
     status: Optional[str] = None,
@@ -182,7 +169,7 @@ async def list_models(
 @router.get(
     "/models/{model_id}",
     response_model=ModelResponse,
-    dependencies=[Depends(admin_required)]
+    dependencies=[Depends(require_role(RoleChoicesSchema.SUPER_ADMIN))]
 )
 async def get_model(
     model_id: UUID,
@@ -205,7 +192,7 @@ async def get_model(
 @router.get(
     "/status",
     response_model= Dict[str, Any],
-    dependencies=[Depends(admin_required)]
+    dependencies=[Depends(require_role(RoleChoicesSchema.SUPER_ADMIN))]
 )
 async def get_ml_status(
     session: AsyncSession = Depends(get_session)
@@ -266,7 +253,7 @@ async def get_ml_status(
 @router.post(
     "/evaluate",
     response_model=EvaluationResponse,
-    dependencies=[Depends(admin_required)]
+    dependencies=[Depends(require_role(RoleChoicesSchema.SUPER_ADMIN))]
 )
 async def evaluate_model(
     request: EvaluationRequest,
@@ -302,7 +289,7 @@ async def evaluate_model(
 @router.post(
     "/deploy",
     response_model=DeploymentResponse,
-    dependencies=[Depends(admin_required)]
+    dependencies=[Depends(require_role(RoleChoicesSchema.SUPER_ADMIN))]
 )
 async def deploy_model(
     request: DeploymentRequest,
@@ -335,7 +322,7 @@ async def deploy_model(
 @router.post(
     "/auto-deploy",
     status_code=status.HTTP_202_ACCEPTED,
-    dependencies=[Depends(admin_required)]
+    dependencies=[Depends(require_role(RoleChoicesSchema.SUPER_ADMIN))]
 )
 async def trigger_auto_deploy(performance_threshold: float = 0.0) -> dict:
     """

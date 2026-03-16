@@ -1,22 +1,58 @@
 {% extends "base.html" %}
 
-{% block title %} Account Activation {% endblock %}
+{% block title %} Kích hoạt tài khoản {% endblock %}
 
-{% block header %} Activate Your Account {% endblock %}
+{% block header %} Kích hoạt tài khoản của bạn {% endblock %}
 
 {% block content %}
-<h2>Welcome to {{site_name}}! </h2>
-<p>Thank you for registering with us. Please click the button below to activate your account:</p>
-<a href="{{ activation_url }}"
-  style="background-color: #4CAF50; color: white; padding: 14px 20px; text-decoration: none; border-radius: 4px;">
-  Activate Account
-</a>
 
-<p>If the button does not work, copy and paste the following link into your browser:</p>
+<h2>Chào mừng bạn đến với {{ site_name }}!</h2>
+
+<p>
+  Cảm ơn bạn đã đăng ký. Vui lòng nhấp vào nút bên dưới để kích hoạt tài khoản của bạn:
+</p>
+
+<!-- BUTTON -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 20px auto;">
+  <tr>
+    <td align="center" bgcolor="#4CAF50" style="border-radius:4px;">
+      <a href="{{ activation_url }}"
+         target="_blank"
+         style="
+           display:inline-block;
+           padding:14px 20px;
+           font-size:16px;
+           font-family:Arial, sans-serif;
+           color:#ffffff;
+           text-decoration:none;
+           border-radius:4px;
+           font-weight:600;
+         ">
+        Kích hoạt tài khoản
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p>
+  Nếu nút không hoạt động, vui lòng sao chép và dán liên kết sau vào trình duyệt của bạn:
+</p>
+
 <div
-  style="word-break: break-all; background-color: #f5f5f5; padding: 10px; border-radius: 4px; margin: 10px 0; font-family: monospace;">
+  style="
+    word-break: break-all;
+    background-color: #f5f5f5;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+    font-family: monospace;
+    font-size: 13px;
+  ">
   {{ activation_url }}
 </div>
-<p>This link will expire in {{ expiry_time }} minutes.</p>
+
+<p>
+  Liên kết này sẽ hết hạn sau <strong>{{ expiry_time }} phút</strong>.
+</p>
 
 {% endblock %}

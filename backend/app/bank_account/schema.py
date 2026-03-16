@@ -1,7 +1,9 @@
 from datetime import datetime
 from uuid import UUID
+from typing_extensions import Annotated
 
 from sqlmodel import Field, SQLModel
+from decimal import Decimal
 
 from backend.app.bank_account.enums import (
     AccountCurrencyEnum,
@@ -16,7 +18,10 @@ class BankAccountBaseSchema(SQLModel):
     """
 
     account_type: AccountTypeEnum          # Loại tài khoản (thanh toán, tiết kiệm, doanh nghiệp...)
-    currency: AccountCurrencyEnum           # Loại tiền tệ của tài khoản
+    currency: AccountCurrencyEnum = Field(
+        default=AccountCurrencyEnum.VND,
+        nullable=False
+    )         # Loại tiền tệ của tài khoản
     account_status: AccountStatusEnum = Field(
         default=AccountStatusEnum.Pending
     )                                       # Trạng thái tài khoản
@@ -26,7 +31,7 @@ class BankAccountBaseSchema(SQLModel):
     )                                       # Số tài khoản (duy nhất)
 
     account_name: str                       # Tên hiển thị của tài khoản
-    balance: float = Field(default=0.0)     # Số dư hiện tại
+    balance: Annotated[Decimal, Field(decimal_places=0)] = Field(default=Decimal("0"))     # Số dư hiện tại
 
     is_primary: bool = Field(default=False) # Tài khoản chính của người dùng
 
@@ -59,7 +64,7 @@ class BankAccountReadSchema(BankAccountBaseSchema):
     updated_at: datetime
 
 
-class BankAccountUpdateSchema(BankAccountBaseSchema):
+class BankAccountUpdateSchema(SQLModel):
     """
     Schema dùng để cập nhật thông tin tài khoản ngân hàng.
     Chỉ các field được truyền mới được cập nhật.

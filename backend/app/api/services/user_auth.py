@@ -5,7 +5,8 @@ from fastapi import HTTPException, status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from backend.app.auth.models import User
-from backend.app.auth.schema import AccountStatusSchema, UserCreateSchema
+from backend.app.auth.schema import AccountStatusSchema, UserCreateSchema, ChangePasswordSchema, ChangeInitialPasswordSchema
+from backend.app.role.schema import RoleChoicesSchema
 from backend.app.auth.utils import (
     generate_username, generate_password_hash,
     create_activation_token, generate_otp, verify_password
@@ -14,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from backend.app.core.services.activation_email import send_activation_email
 from backend.app.core.services.login_otp import send_login_otp_email
 from backend.app.core.services.account_lockout import send_account_lockout_email
+from backend.app.api.services.user_role import user_role_service
 from backend.app.core.config import settings
 from backend.app.core.logging import get_logger
 
@@ -24,7 +26,7 @@ class UserAuthService:
         self,
         email: str,
         session: AsyncSession,
-        include_inactive: bool = False,
+        include_inactive: bool = False,#
     ) -> User | None:
         """Lấy thông tin user qua email"""
         # Tạo câu truy vấn lấy user theo email
@@ -37,7 +39,7 @@ class UserAuthService:
         return user
     async def get_user_by_id_no(
         self,
-        id_no: int,
+        id_no: str,
         session: AsyncSession,
         include_inactive: bool = False,
     ) -> User | None:
@@ -70,7 +72,7 @@ class UserAuthService:
         """Kiểm tra email đã tồn tại trong hệ thống hay chưa"""
         user = await self.get_user_by_email(email, session)
         return bool(user)
-    async def check_user_id_no_exists(self, id_no: int, session: AsyncSession) -> bool:
+    async def check_user_id_no_exists(self, id_no: str, session: AsyncSession) -> bool:
         """Kiểm tra số giấy tờ tùy thân (CCCD/CMND) đã tồn tại trong hệ thống hay chưa"""
         user = await self.get_user_by_id_no(id_no, session)
         return bool(user)
@@ -112,7 +114,7 @@ class UserAuthService:
         # Ghi log nếu trạng thái tài khoản có thay đổi
         if log_action and previous_status != user.account_status:
             logger.info(
-                f"User {user.email} state reset: "
+                f"Trạng thái tài khoản người dùng {user.email} đã được reset: "
                 f"{previous_status} -> {user.account_status}"
             )
     async def validate_user_status(self, user: User) -> None:
@@ -123,8 +125,8 @@ class UserAuthService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Your account is not activated",
-                    "action": "Please activate your account first",
+                    "message": "Tài khoản của bạn chưa được kích hoạt",
+                    "action": "Vui lòng kích hoạt tài khoản trước",
                 },
             )
         # Kiểm tra tài khoản có đang bị khóa hay không
@@ -133,8 +135,8 @@ class UserAuthService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Your account is locked",
-                    "action": "Please contact support",
+                    "message": "Tài khoản của bạn đã bị khóa",
+                    "action": "Vui lòng liên hệ với bộ phận hỗ trợ",
                 },
             )
         # Kiểm tra tài khoản có đang ở trạng thái inactive hay không
@@ -143,8 +145,8 @@ class UserAuthService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Your account is inactive",
-                    "action": "Please activate your account",
+                    "message": "Tài khoản của bạn chưa được kích hoạt",
+                    "action": "Vui lòng kích hoạt tài khoản trước",
                 },
             )
     async def generate_and_save_otp(
@@ -170,12 +172,12 @@ class UserAuthService:
                 try:
                     # Gửi OTP qua email
                     await send_login_otp_email(user.email, otp)
-                    logger.info(f"OTP sent to {user.email} successfully")
-                    # # Gửi thành công
+                    logger.info(f"Mã OTP đã được gửi đến {user.email} thành công")
+                    # Gửi thành công
                     return True, otp
                 except Exception as e:
                     logger.error(
-                        f"Failed to send OTP email (attempt {attempt + 1}): {e}"
+                        f"Lỗi khi gửi mã OTP qua email (attempt {attempt + 1}): {e}"
                     )
                     # Nếu đã thử đủ 3 lần mà vẫn thất bại
                     if attempt == 2:
@@ -189,7 +191,7 @@ class UserAuthService:
                     await asyncio.sleep(2 ** attempt)
             return False, ""
         except Exception as e:
-            logger.error(f"Failed to generate and save OTP: {e}")
+            logger.error(f"Lỗi khi tạo và lưu mã OTP: {e}")
             # Rollback trạng thái OTP khi có lỗi bất ngờ
             user.otp = ""
             user.otp_expiry_time = None
@@ -216,7 +218,7 @@ class UserAuthService:
         password = user_data_dict.pop("password")
         # Tạo đối tượng User mới
         new_user = User(
-            username=generate_username(),                 # Sinh username tự động
+            username=generate_username(),                # Sinh username tự động
             hashed_password=generate_password_hash(password),  # Mã hóa mật khẩu
             is_active=False,                              # Chưa kích hoạt
             account_status=AccountStatusSchema.PENDING,   # Chờ kích hoạt
@@ -231,10 +233,10 @@ class UserAuthService:
         try:
             # Gửi email kích hoạt tài khoản cho người dùng
             await send_activation_email(new_user.email, activation_token)
-            logger.info(f"Activation email sent to {new_user.email}")
+            logger.info(f"Email kích hoạt tài khoản đã được gửi đến {new_user.email}")
         except Exception as e:
             # Log lỗi nếu gửi email thất bại
-            logger.error(f"Failed to send activation email to {new_user.email}: {e}")
+            logger.error(f"Lỗi khi gửi email kích hoạt tài khoản đến {new_user.email}: {e}")
             # Ném exception để tầng trên xử lý (rollback, thông báo client, ...)
             raise
         return new_user
@@ -253,7 +255,7 @@ class UserAuthService:
             )
             # Kiểm tra loại token có đúng là token kích hoạt không
             if payload.get("type") != "activation":
-                raise ValueError("Invalid token type")
+                raise ValueError("Loại token không hợp lệ")
             user_id = uuid.UUID(payload["id"])
             # Lấy user kể cả khi chưa active
             user = await self.get_user_by_id(
@@ -267,7 +269,7 @@ class UserAuthService:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail={
                         "status": "error",
-                        "message": "User not found",
+                        "message": "Không tìm thấy người dùng",
                     },
                 )
             # Tài khoản đã được kích hoạt trước đó
@@ -276,7 +278,7 @@ class UserAuthService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail={
                         "status": "error",
-                        "message": "User already activated",
+                        "message": "Tài khoản đã được kích hoạt trước đó",
                     },
                 )
             # Reset trạng thái bảo mật (OTP, failed login, mở khóa nếu có)
@@ -289,6 +291,11 @@ class UserAuthService:
             # Kích hoạt tài khoản
             user.is_active = True
             user.account_status = AccountStatusSchema.ACTIVE
+            await user_role_service.assign_role_to_user(
+                session=session,
+                user_id=user.id,
+                role=RoleChoicesSchema.CUSTOMER
+            )
             # Lưu thay đổi vào CSDL
             await session.commit()
             await session.refresh(user)
@@ -299,7 +306,7 @@ class UserAuthService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Activation token expired",
+                    "message": "Token kích hoạt đã hết hạn",
                 },
             )
         # Token không hợp lệ
@@ -308,7 +315,7 @@ class UserAuthService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Invalid activation token",
+                    "message": "Token kích hoạt không hợp lệ",
                 },
             )
         # Re-raise các HTTPException đã được định nghĩa
@@ -316,7 +323,7 @@ class UserAuthService:
             raise http_ex
         # Lỗi không xác định
         except Exception as e:
-            logger.error(f"Failed to activate user account: {e}")
+            logger.error(f"Lỗi khi kích hoạt tài khoản: {e}")
             raise
     async def verify_login_otp(
         self,
@@ -332,7 +339,7 @@ class UserAuthService:
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail={
                         "status": "error",
-                        "message": "Invalid credentials",
+                        "message": "Tài khoản không hợp lệ",
                     },
                 )
             # Kiểm tra trạng thái tài khoản
@@ -347,8 +354,8 @@ class UserAuthService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail={
                         "status": "error",
-                        "message": "Invalid OTP",
-                        "action": "Please check your OTP and try again",
+                        "message": "Mã OTP không hợp lệ",
+                        "action": "Vui lòng kiểm tra lại mã OTP và thử lại",
                     },
                 )
             # Kiểm tra thời hạn của OTP
@@ -359,8 +366,8 @@ class UserAuthService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail={
                         "status": "error",
-                        "message": "OTP has expired",
-                        "action": "Please request a new OTP",
+                        "message": "Mã OTP đã hết hạn.",
+                        "action": "Vui lòng yêu cầu mã OTP mới.",
                     },
                 )
             # Reset trạng thái đăng nhập thất bại, giữ lại OTP nếu cần xử lý bước tiếp theo
@@ -370,13 +377,13 @@ class UserAuthService:
         except HTTPException as http_ex:
             raise http_ex
         except Exception as e:
-            logger.error(f"Error during OTP verification: {e}")
+            logger.error(f"Lỗi khi xác thực mã OTP: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail={
                     "status": "error",
-                    "message": "Failed to verify OTP",
-                    "action": "Please try again later",
+                    "message": "Lỗi khi xác thực mã OTP.",
+                    "action": "Vui lòng thử lại sau.",
                 },
             )
     async def check_user_lockout(
@@ -399,18 +406,18 @@ class UserAuthService:
         # Nếu đã hết thời gian khóa → tự động mở khóa tài khoản
         if current_time >= lockout_time:
             await self.reset_user_state(user, session, clear_otp=False)
-            logger.info(f"Lockout period ended for user {user.email}")
+            logger.info(f"Thời gian khóa tài khoản đã kết thúc cho người dùng {user.email}")
             return
         # Tính số phút còn lại trước khi có thể đăng nhập lại
         remaining_minutes = int((lockout_time - current_time).total_seconds() / 60)
-        logger.warning(f"Attempted login to locked account: {user.email}")
+        logger.warning(f"Phát hiện nỗ lực đăng nhập vào tài khoản đã bị khóa: {user.email}")
         # Từ chối đăng nhập khi tài khoản vẫn đang bị khóa
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "status": "error",
-                "message": "Your account is temporarily locked",
-                "action": f"Please try again after {remaining_minutes} minutes",
+                "message": "Tài khoản của bạn đã bị khóa tạm thời",
+                "action": f"Vui lòng thử lại sau {remaining_minutes} phút",
                 "lockout_remaining_minutes": remaining_minutes,
             },
         )
@@ -429,23 +436,92 @@ class UserAuthService:
         if user.failed_login_attempts >= settings.LOGIN_ATTEMPTS:
             user.account_status = AccountStatusSchema.LOCKED
             logger.warning(
-                f"User {user.email} has been locked out the due to too many failed login attempts"
+                f"Tài khoản {user.email} đã bị khóa do quá nhiều lần đăng nhập sai"
             )
             try:
                 # Gửi email thông báo tài khoản bị khóa
                 await send_account_lockout_email(user.email, current_time)
-                logger.info(f"Account lockout notification email sent to {user.email}")
+                logger.info(f"Thông báo tài khoản bị khóa đã được gửi đến {user.email}")
             except Exception as e:
                 # Không chặn luồng xử lý nếu gửi email thất bại
                 logger.error(
-                    f"Failed to send account lockout email to {user.email}: {e}"
+                    f"Lỗi khi gửi thông báo tài khoản bị khóa đến {user.email}: {e}"
                 )
             logger.warning(
-                f"User {user.email} has been locked out due to too many failed login attempts"
+                f"Tài khoản {user.email} đã bị khóa do quá nhiều lần đăng nhập sai"
             )
         await session.commit()
         await session.refresh(user)
-    # Đặt lại mật khẩu cho người dùng
+    # thay đổi mật khẩu cho user
+    async def change_user_password(
+        self,
+        user_id: uuid.UUID,
+        data: ChangePasswordSchema,
+        session: AsyncSession
+    ) -> None:
+        """Thay đổi mật khẩu cho user"""
+        user = await self.get_user_by_id(user_id, session)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "status": "error",
+                    "message": "Người dùng không tồn tại"
+                }
+            )
+        # Kiểm tra pass cũ có đúng không
+        if not await self.verify_user_password(data.current_password, user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "status": "error",
+                    "message": "Mật khẩu hiện tại không đúng"
+                }
+            )
+        # Kiểm tra pass mới có khác pass cũ không
+        if await self.verify_user_password(data.new_password, user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "status": "error",
+                    "message": "Mật khẩu mới phải khác mật khẩu hiện tại"
+                }
+            )
+        # Cập nhật mật khẩu mới
+        user.hashed_password = generate_password_hash(data.new_password)
+        logger.info(f"Thay đổi mật khẩu cho user {user.email}")
+        await session.commit()
+        await session.refresh(user)
+    # thay đổi mật khẩu cho user(hệ thống)
+    async def change_initial_password(
+        self,
+        user_id: uuid.UUID,
+        data: ChangeInitialPasswordSchema,
+        session: AsyncSession
+    ) -> None:
+        """Thay đổi mật khẩu cho user"""
+        user = await self.get_user_by_id(user_id, session)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "status": "error",
+                    "message": "Người dùng không tồn tại"
+                }
+            )
+        # Chỉ áp dụng với user bị đánh dấu
+        if not user.must_change_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"message": "User không cần đổi mật khẩu lần đầu."}
+            )
+        # Cập nhật mật khẩu mới
+        user.hashed_password = generate_password_hash(data.new_password)
+        user.must_change_password = False
+        logger.info(f"Thay đổi mật khẩu cho user {user.email}")
+        await session.commit()
+        await session.refresh(user)
+    # Đặt lại mật khẩu cho người dùng(Khi quên mật khẩu)
     async def reset_password(
         self,
         token: str,
@@ -458,7 +534,7 @@ class UserAuthService:
                 token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
             )
             if payload.get("type") != "password_reset":
-                raise ValueError("Invalid reset token")
+                raise ValueError("Token reset không hợp lệ")
             # Lấy user ID từ payload
             user_id = uuid.UUID(payload["id"])
             # Lấy user kể cả khi chưa active
@@ -467,7 +543,7 @@ class UserAuthService:
             if not user:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail={"status": "error", "message": "User not found"},
+                    detail={"status": "error", "message": "Người dùng không tồn tại"},
                 )
             # Cập nhật pass mới
             user.hashed_password = generate_password_hash(new_password)
@@ -477,14 +553,14 @@ class UserAuthService:
             await session.commit()
             await session.refresh(user)
 
-            logger.info(f"Password reset successful for user {user.email}")
+            logger.info(f"Thay đổi mật khẩu thành công cho người dùng {user.email}")
 
         except jwt.ExpiredSignatureError:
-            raise ValueError("Password reset token expired")
+            raise ValueError("Token reset mật khẩu đã hết hạn")
         except jwt.InvalidTokenError:
-            raise ValueError("Invalid password reset token")
+            raise ValueError("Token reset mật khẩu không hợp lệ")
         except Exception as e:
-            logger.error(f"Failed to reset password: {e} ")
+            logger.error(f"Lỗi khi reset mật khẩu: {e} ")
             raise
         
 user_auth_service = UserAuthService()

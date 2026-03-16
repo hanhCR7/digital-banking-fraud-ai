@@ -8,7 +8,7 @@ from backend.app.core.emails.base import EmailTemplate
 class WithdrawalAlertEmail(EmailTemplate):
     template_name = "withdrawal_alert.html"
     template_name_plain = "withdrawal_alert.txt"
-    subject = "Withdrawal Alert"
+    subject = "Thông báo rút tiền"
 
 
 async def send_withdrawal_alert(

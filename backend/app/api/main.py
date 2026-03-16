@@ -5,6 +5,8 @@ from backend.app.api.routes.auth import (
     activate,
     login,
     logout,
+    change_password,
+    change_pass_seed_admin,
     password_reset,
     refresh,
     register,
@@ -12,11 +14,7 @@ from backend.app.api.routes.auth import (
 from backend.app.api.routes.bank_account import activate as bank_account_activate
 from backend.app.api.routes.bank_account import create as create_bank_account
 from backend.app.api.routes.bank_account import (
-    deposit,
     statement,
-    transaction_history,
-    transfer,
-    withdrawal,
 )
 from backend.app.api.routes.card import activate as activate_card
 from backend.app.api.routes.card import block
@@ -29,7 +27,10 @@ from backend.app.api.routes.next_of_kin import create as create_next_of_kin
 from backend.app.api.routes.next_of_kin import delete
 from backend.app.api.routes.next_of_kin import update as update_next_of_kin
 from backend.app.api.routes.profile import all_profiles, create, me, update, upload
-from backend.app.api.routes.transaction import fraud_review, risk_history
+from backend.app.api.routes.transaction import deposit, fraud_review, risk_history, transaction_dashboard, transaction_history, transfer, withdrawal
+from backend.app.api.routes.admin import user_role
+from backend.app.api.routes.admin import users
+
 
 api_router = APIRouter()
 
@@ -37,6 +38,8 @@ api_router.include_router(home.router)
 api_router.include_router(register.router)
 api_router.include_router(activate.router)
 api_router.include_router(login.router)
+api_router.include_router(change_password.router)
+api_router.include_router(change_pass_seed_admin.router)
 api_router.include_router(password_reset.router)
 api_router.include_router(refresh.router)
 api_router.include_router(logout.router)
@@ -63,4 +66,7 @@ api_router.include_router(topup.router)
 api_router.include_router(delete_card.router)
 api_router.include_router(fraud_review.router)
 api_router.include_router(risk_history.router)
+api_router.include_router(transaction_dashboard.router)
 api_router.include_router(api.router)
+api_router.include_router(user_role.router)
+api_router.include_router(users.router)

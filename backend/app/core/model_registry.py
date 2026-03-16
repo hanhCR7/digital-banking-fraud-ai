@@ -6,12 +6,28 @@ from backend.app.core.logging import get_logger
 
 logger = get_logger()
 
+PRIORITY_MODELS = [
+    "backend.app.user_role.models",        
+    "backend.app.role_permission.models",  
+    "backend.app.role.models",
+    "backend.app.permission.models",
+    "backend.app.auth.models",             
+    "backend.app.user_profile.models",
+    "backend.app.next_of_kin.models",
+    "backend.app.bank_account.models",
+    "backend.app.virtual_card.models",
+    "backend.app.transaction.models",
+    "backend.app.core.ai.models",
+    "backend.app.core.ml.models",
+    "backend.app.core.rate_limit.models",
+]
+
 # Hàm phát hiện toàn bộ các file models.py trong dự án
 def discover_models() -> list[str]:
     models_modules = []
     root_path = pathlib.Path(__file__).parent.parent
 
-    logger.debug(f"Searching for models in the root path: {root_path}")
+    logger.debug(f"Đang tìm kiếm các file model trong thư mục gốc: {root_path}")
     # Duyệt qua all các folder để tìm file models.py
     for root, _, files in os.walk(root_path):
         # Bỏ qua các thư mục không liên quan như môi trường ảo và cache
@@ -29,17 +45,28 @@ def discover_models() -> list[str]:
             else:
                 full_module_path = f"backend.app.{module_path}.models"
 
-            logger.debug(f"Discovered models file in: {full_module_path}")
-
+            logger.debug(f"Đã phát hiện file models tại module: {full_module_path}")
             models_modules.append(full_module_path)
     return models_modules
 
 # Import toàn bộ các module model đã được phát hiện
 def load_models() -> None:
-    modules = discover_models()
-    for module_path in modules:
+    loaded: set[str] = set()
+
+    # 1. Load các model theo thứ tự ưu tiên trước
+    for module_path in PRIORITY_MODELS:
         try:
             importlib.import_module(module_path)
-            logger.debug(f"Imported module {module_path}")
+            logger.debug(f"[priority] Import module thành công: {module_path}")
+            loaded.add(module_path)
         except ImportError as e:
-            logger.error(f"Failed to import module {module_path}: {e}")
+            logger.error(f"[priority] Import module thất bại: {module_path}. Lỗi: {e}")
+
+    # 2. Load các model còn lại (auto-discover, bỏ qua đã load)
+    for module_path in discover_models():
+        if module_path not in loaded:
+            try:
+                importlib.import_module(module_path)
+                logger.debug(f"Import module thành công: {module_path}")
+            except ImportError as e:
+                logger.error(f"Import module thất bại: {module_path}. Lỗi: {e}")

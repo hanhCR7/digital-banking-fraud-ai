@@ -1,16 +1,17 @@
 {% extends "base.html" %}
 
-{% block header %} One-Time Password {% endblock %}
+{% block header %} Mã Xác Thực Một Lần {% endblock %}
 
 {% block content %}
-Hello,
+Xin chào,
 
-Your One-Time password (OTP) for transfer authorization is:
+Mã xác thực một lần (OTP) dùng để xác thực giao dịch chuyển tiền của bạn là:
 {{ otp }}
 
-This OTP is valid for {{ expiry_time }} minutes. Please use it within this time frame to complete your transfer
-  authorization.
+Mã OTP này có hiệu lực trong vòng {{ expiry_time }} phút.
+Vui lòng sử dụng mã trong khoảng thời gian này để hoàn tất việc xác thực chuyển tiền.
 
-If you did not initiate this transfer, please ignore this email and contact our support team immediately.
+Nếu bạn không khởi tạo giao dịch chuyển tiền này,
+vui lòng bỏ qua email và liên hệ ngay với bộ phận hỗ trợ của chúng tôi.
 
 {% endblock %}

@@ -8,7 +8,8 @@ from backend.app.api.services.card import activate_virtual_card
 from backend.app.core.db import get_session
 from backend.app.core.logging import get_logger
 from backend.app.core.services.card_activated import send_card_activated_email
-
+from backend.app.api.services.security import require_permission
+from backend.app.permission.schema import PermissionChoicesSchema
 logger = get_logger()
 router = APIRouter(prefix="/virtual-card", tags=["Virtual Card"])
 
@@ -16,11 +17,12 @@ router = APIRouter(prefix="/virtual-card", tags=["Virtual Card"])
 @router.patch(
     "/{card_id}/activate",
     status_code=status.HTTP_200_OK,
-    description="Activate a virtual card. Only account executives can perform this action",
+
+    description="Kích hoạt thẻ ảo. Chỉ Account Executive được phép thực hiện hành động này",
 )
 async def activate_card(
     card_id: UUID,
-    current_user: CurrentUser,
+    current_user = Depends(require_permission(PermissionChoicesSchema.ACTIVATE_CARD)),
     session: AsyncSession = Depends(get_session),
 ):
     # API kích hoạt thẻ ảo (chỉ Account Executive được phép)
@@ -48,12 +50,12 @@ async def activate_card(
             )
         except Exception as email_error:
             # Không rollback nếu gửi email thất bại
-            logger.error(f"Failed to send card activation email: {email_error}")
+            logger.error(f"Gửi thông báo kích hoạt thẻ thất bại: {email_error}")
 
         # Trả về kết quả kích hoạt thẻ
         return {
             "status": "success",
-            "message": "Card activated successfully",
+            "message": "Kích hoạt thẻ thành công.",
             "data": {
                 "card_id": str(card.id),
                 "status": card.card_status.value,
@@ -71,11 +73,11 @@ async def activate_card(
 
     except Exception as e:
         # Lỗi hệ thống không xác định
-        logger.error(f"Failed to activate virtual card: {e}")
+        logger.error(f"Kích hoạt thẻ thất bại: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to activate virtual card",
+                "message": "Kích hoạt thẻ thất bại.",
             },
         )

@@ -14,14 +14,14 @@ from backend.app.transaction.enums import (
 from backend.app.core.ai.enums import AIReviewStatusEnum
 class TransactionBaseSchema(SQLModel):
     """Schema nền tảng cho giao dịch tài chính."""
-    amount: Annotated[Decimal, Field(decimal_places=2, ge=0)]  # Số tiền giao dịch
+    amount: Annotated[Decimal, Field(decimal_places=0, ge=0)]  # Số tiền giao dịch
     description: str = Field(max_length=250)                   # Nội dung giao dịch
     reference: str = Field(unique=True, index=True)            # Mã giao dịch duy nhất
     transaction_type: TransactionTypeEnum                      # Loại giao dịch
     transaction_category: TransactionCategoryEnum              # Credit / Debit
     status: TransactionStatusEnum = Field(default=TransactionStatusEnum.Pending)  # Trạng thái
-    balance_before: Annotated[Decimal, Field(decimal_places=2)]  # Số dư trước giao dịch
-    balance_after: Annotated[Decimal, Field(decimal_places=2)]   # Số dư sau giao dịch
+    balance_before: Annotated[Decimal, Field(decimal_places=0)]  # Số dư trước giao dịch
+    balance_after: Annotated[Decimal, Field(decimal_places=0)]   # Số dư sau giao dịch
     transaction_metadata: dict | None = Field(default=None, sa_column=Column(JSONB))  # Dữ liệu bổ sung (JSON)
     failed_reason: str | None = Field(default=None)  # Lý do thất bại (nếu có)
     # Trạng thái đánh giá rủi ro giao dịch bởi hệ thống AI
@@ -47,7 +47,7 @@ class TransactionUpdateSchema(TransactionBaseSchema):
 
 class DepositRequestSchema(SQLModel):
     account_id: uuid.UUID# ID tài khoản nhận tiền
-    amount: Decimal = Field(ge=0, decimal_places=2)# Số tiền nạp vào tài khoản
+    amount: Decimal = Field(ge=0, decimal_places=0)# Số tiền nạp vào tài khoản
     description: str = Field(max_length=250)# Nội dung giao dịch
 
 class TransferRequestSchema(SQLModel):
@@ -56,7 +56,7 @@ class TransferRequestSchema(SQLModel):
     receiver_account_number: str = Field(
         min_length=16, max_length=16
     )                                                 # Số tài khoản nhận
-    amount: Decimal = Field(ge=0, decimal_places=2)   # Số tiền chuyển
+    amount: Decimal = Field(ge=0, decimal_places=0)   # Số tiền chuyển
     security_answer: str = Field(max_length=30)       # Câu trả lời bảo mật
     description: str = Field(max_length=250)          # Nội dung chuyển tiền
 
@@ -73,21 +73,9 @@ class TransferResponseSchema(SQLModel):
     message: str                                      # Thông báo
     data: dict | None = None                          # Dữ liệu trả về
 
-class CurrencyConversionSchema(SQLModel):
-    """Schema kết quả chuyển đổi tiền tệ."""
-    amount: Decimal                     # Số tiền sau chuyển đổi
-    from_currency: str                  # Tiền tệ gốc
-    to_currency: str                    # Tiền tệ đích
-    exchange_rate: Decimal              # Tỷ giá áp dụng
-    original_amount: Decimal            # Số tiền ban đầu
-    converted_amount: Decimal           # Số tiền sau quy đổi
-    conversion_fee: Decimal = Field(
-        default=Decimal("0.00")
-    )                                   # Phí chuyển đổi
-
 class WithdrawalRequestSchema(SQLModel):
     account_number: str = Field(min_length=16, max_length=16) # Số tài khoản rút tiền
-    amount: Decimal = Field(ge=0, decimal_places=2)          # Số tiền rút
+    amount: Decimal = Field(ge=0, decimal_places=0)          # Số tiền rút
     username: str = Field(min_length=1, max_length=12)        # Tên đăng nhập người rút
     description: str = Field(max_length=250)                    # Nội dung giao dịch
 
@@ -105,10 +93,7 @@ class TransactionHistoryResponseSchema(SQLModel):
     completed_at: datetime | None = None  # Thời điểm hoàn tất
     balance_after: Decimal            # Số dư sau giao dịch
 
-    currency: str | None = None       # Tiền tệ giao dịch
-    converted_amount: str | None = None  # Số tiền sau quy đổi (nếu có)
-    from_currency: str | None = None  # Tiền tệ nguồn
-    to_currency: str | None = None    # Tiền tệ đích
+    currency: str = "VND"      # Tiền tệ giao dịch
     counterparty_name: str | None = None     # Tên đối tác
     counterparty_account: str | None = None  # Tài khoản đối tác
 
@@ -197,11 +182,18 @@ class RiskHistoryParams(SQLModel):
     skip: int = 0
     limit: int = 20
 
+class RiskHistoryAllUserParams(SQLModel):
+    """Tham số lọc và phân trang lịch sử đánh giá rủi ro."""
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    min_risk_score: float | None = None
+    skip: int = 0
+    limit: int = 20
 class RiskHistoryItemSchema(SQLModel):
     """
     Schema đại diện cho một bản ghi lịch sử đánh giá rủi ro giao dịch.
     """
-    transaction_id: str # Mã định danh giao dịch
+    transaction_id: uuid.UUID # Mã định danh giao dịch
     reference: str    # Mã tham chiếu giao dịch
     amount: str    # Số tiền giao dịch (đã định dạng)
     created_at: datetime    # Thời điểm phát sinh giao dịch
@@ -209,7 +201,7 @@ class RiskHistoryItemSchema(SQLModel):
     risk_factors: dict    # Các yếu tố rủi ro AI phát hiện (lưu dạng JSON)
     review_status: AIReviewStatusEnum | None = None    # Trạng thái đánh giá của AI
     is_confirmed_fraud: bool | None = None    # Kết quả xác nhận gian lận cuối cùng
-    reviewed_by: str | None = None    # Người thực hiện kiểm duyệt thủ công (nếu có)
+    reviewed_by: uuid.UUID | None = None    # Người thực hiện kiểm duyệt thủ công (nếu có)
     review_details: dict | None = None    # Thông tin chi tiết quá trình kiểm duyệt
 
 class PaginatedHistoryResponseSchema(SQLModel):
@@ -220,3 +212,5 @@ class PaginatedHistoryResponseSchema(SQLModel):
     skip: int
     limit: int
     items: list[RiskHistoryItemSchema]
+
+

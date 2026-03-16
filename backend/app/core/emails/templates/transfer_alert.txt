@@ -1,48 +1,40 @@
 {% extends "base.html" %}
 
-{% block header %} {% if is_sender %}Transfer Confirmation {% else %} Transfer Received {% endif %}{% endblock %}
+{% block header %}
+{% if is_sender %}Xác Nhận Chuyển Tiền{% else %}Thông Báo Nhận Tiền{% endif %}
+{% endblock %}
 
 {% block content %}
 
-Dear {{ user_name }}
+Kính gửi {{ user_name }},
 
-{% if is_sender %}Your transfer has been completed successfully {% else %} You have received a transfer to your
-  account {% endif %} Here are the details:
+{% if is_sender %}
+Giao dịch chuyển tiền của bạn đã được thực hiện thành công.
+{% else %}
+Bạn vừa nhận được một khoản tiền chuyển vào tài khoản của mình.
+{% endif %}
 
-    {% if is_sender %}
-     Amount Sent: {{ from_currency }} {{ amount }}
-    {% if conversion_applied %}
-    Converted Amount:  {{ to_currency }} {{ converted_amount }}
+Thông tin chi tiết giao dịch:
 
-     Exchange Rate:  1 {{ from_currency }} = {{ exchange_rate }} {{
-      to_currency }}
-   Conversion Fee:  {{ from_currency }} {{ conversion_fee }} 
-    {% endif %}
+{% if is_sender %}
+Số tiền đã chuyển: {{ amount }}
+Người nhận: {{ counterparty_name }}
+Tài khoản người nhận: {{ counterparty_account }}
+{% else %}
+Số tiền nhận được: {{ amount }}
+Người gửi: {{ counterparty_name }}
+{% endif %}
 
-   Recipient:  {{ counterparty_name }}
-    Recipient Account: {{ counterparty_account }}
-
-    {% else %}
-    Amount Received:  {{ to_currency }} {{amount}}
-
-    {% if conversion_applied %}
-    Original Amount: {{ from_currency }} {{ amount }}
-    Exchange Rate:  1 {{ from_currency }} = {{ exchange_rate }}
-      {{to_currency}}
-    {% endif %}
-    From:  {{ counterparty_name }}
-    {% endif %}
-     Description:  {{ description }}
-     Reference:  {{ reference }}
-     Date:  {{ transaction_date }}
-    Your Available Balance:  {{ user_currency }} {{ user_balance }}
-
+Nội dung: {{ description }}
+Mã tham chiếu: {{ reference }}
+Thời gian: {{ transaction_date }}
+Số dư khả dụng của bạn: {{ user_balance }}
 
 {% if is_sender %}
 
- Security Tip: If you did not authorize this transfer, please contact our
-    support team immediately
-
+Mẹo bảo mật:
+Nếu bạn không thực hiện hoặc không cho phép giao dịch chuyển tiền này,
+vui lòng liên hệ ngay với bộ phận hỗ trợ của chúng tôi.
 
 {% endif %}
 

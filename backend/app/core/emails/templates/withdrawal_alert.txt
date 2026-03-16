@@ -1,26 +1,25 @@
 {% extends "base.html" %}
 
-
-{% block header %} Withdrawal Alert {% endblock %}
+{% block header %} Cảnh Báo Rút Tiền {% endblock %}
 
 {% block content %}
 
-Dear {{full_name}},
+Kính gửi {{ full_name }},
 
-A withdrawal has been processed on your account with the following details:
+Một giao dịch rút tiền vừa được xử lý trên tài khoản của bạn với các thông tin chi tiết như sau:
 
   
-    Amount: {{ currency }} {{ amount }}
-    Account Name: {{ account_name }}
-    Account Number:  {{ account_number }}
+    Số tiền: {{ currency }} {{ amount }}
+    Tên tài khoản: {{ account_name }}
+    Số tài khoản: {{ account_number }}
 
-    Description:  {{ description }} 
-    Date:  {{ transaction_date }}
-    Reference: {{ reference }}
-    Available Balance:  {{ currency }} {{ balance|round(2) }}
+    Nội dung: {{ description }} 
+    Thời gian: {{ transaction_date }}
+    Mã tham chiếu: {{ reference }}
+    Số dư khả dụng: {{ currency }} {{ balance | round(2) }}
  
- If you did not authorize this withdrawal or you notice any
-    discrepancy, please contact our
-    support team immediately.
+Nếu bạn không thực hiện giao dịch rút tiền này hoặc phát hiện bất kỳ
+sai lệch nào, vui lòng liên hệ ngay với
+bộ phận hỗ trợ của chúng tôi.
 
 {% endblock %}

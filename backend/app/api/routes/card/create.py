@@ -10,6 +10,8 @@ from backend.app.virtual_card.schema import (
     VirtualCardCreateSchema,
     VirtualCardReadSchema,
 )
+from backend.app.api.services.security import require_permission
+from backend.app.permission.schema import PermissionChoicesSchema
 
 logger = get_logger()
 router = APIRouter(prefix="/virtual-card", tags=["Virtual Card"])
@@ -19,11 +21,11 @@ router = APIRouter(prefix="/virtual-card", tags=["Virtual Card"])
     "/create",
     response_model=VirtualCardReadSchema,
     status_code=status.HTTP_201_CREATED,
-    description="Create a new virtual card. Card will be in pending status until activated by an account executive.",
+    description="Tạo thẻ ảo mới. Thẻ sẽ ở trạng thái pending cho đến khi được kích hoạt bởi Account Executive.",
 )
 async def create_card(
     card_data: VirtualCardCreateSchema,
-    current_user: CurrentUser,
+    current_user = Depends(require_permission(PermissionChoicesSchema.CREATE_VIRTUAL_CARD)),
     session: AsyncSession = Depends(get_session),
 ) -> VirtualCardReadSchema:
     # API tạo thẻ ảo mới cho người dùng
@@ -51,7 +53,7 @@ async def create_card(
             )
         except Exception as email_error:
             # Không rollback nếu gửi email thất bại
-            logger.error(f"Failed to send card creation email: {email_error}")
+            logger.error(f"Gửi thông báo tạo thẻ thất bại: {email_error}")
 
         # Trả về thông tin thẻ vừa tạo (ẩn các dữ liệu nhạy cảm)
         return VirtualCardReadSchema.model_validate(card)
@@ -62,11 +64,11 @@ async def create_card(
 
     except Exception as e:
         # Lỗi hệ thống không xác định
-        logger.error(f"Failed to create virtual card: {e}")
+        logger.error(f"Tạo thẻ thất bại: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to create virtual card",
+                "message": "Tạo thẻ thất bại.",
             },
         )

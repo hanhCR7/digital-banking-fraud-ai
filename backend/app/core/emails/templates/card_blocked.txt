@@ -1,32 +1,30 @@
 {% extends "base.txt" %}
 
-{% block header %} Your Virtual Card Has Been Blocked {% endblock %}
+{% block header %} Thẻ Ảo Của Bạn Đã Bị Khóa {% endblock %}
 
 {% block content %}
 
-Dear {{full_name}},
+Kính gửi {{ full_name }},
 
-For your security, your virtual card has been blocked
-  
-  Card Type: {{ card_type }}
-  Card Number: {{ masked_card_number }}
-  Block Reason: {{ block_reason }}
-  Additional Informtion: {{ blocked_reason_description }}
+Vì lý do an toàn, thẻ ảo của bạn đã bị khóa.
 
-  Blocked At: {{ blocked_at }}
-  
-Next Steps:
- If you did not request this block, please contact our support team immediately.
-* To unblock your card, please visit our nearest branch with valid identification.
-* For additional assistance, contact our 24/7 support.
+  Loại thẻ: {{ card_type }}
+  Số thẻ: {{ masked_card_number }}
+  Lý do khóa: {{ block_reason }}
+  Thông tin bổ sung: {{ blocked_reason_description }}
 
+  Thời điểm khóa: {{ blocked_at }}
 
-IMPORTANT: For your protection, any pending transactions may be declined while your card is blocked.
+Các bước tiếp theo:
+- Nếu bạn **không yêu cầu khóa thẻ**, vui lòng liên hệ ngay với bộ phận hỗ trợ của chúng tôi.
+- Để mở khóa thẻ, vui lòng đến **chi nhánh gần nhất** và mang theo giấy tờ tùy thân hợp lệ.
+- Để được hỗ trợ thêm, hãy liên hệ **đường dây hỗ trợ 24/7** của chúng tôi.
 
+**QUAN TRỌNG:** Để đảm bảo an toàn, mọi giao dịch đang chờ xử lý có thể sẽ bị từ chối trong thời gian thẻ của bạn bị khóa.
 
-If you need immediate assistance, please contact us at {{ support_email }} or visit your nearest branch.
+Nếu bạn cần hỗ trợ khẩn cấp, vui lòng liên hệ {{ support_email }} hoặc đến chi nhánh gần nhất.
 
+Mẹo bảo mật: Vui lòng bảo mật mã CVV của bạn và không chia sẻ với bất kỳ ai.
+Đây là **lần duy nhất** chúng tôi hiển thị đầy đủ thông tin thẻ của bạn qua email.
 
-Security Tip: Please store your CVV securely and never share it with anyone.
-    This is the only time we will show your complete card details in an email
 {% endblock %}

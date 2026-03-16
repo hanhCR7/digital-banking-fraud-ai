@@ -15,6 +15,8 @@ from backend.app.transaction.schema import (
     StatementRequestSchema,
     StatementResponseSchema,
 )
+from backend.app.api.services.security import require_permission
+from backend.app.permission.schema import PermissionChoicesSchema
 
 logger = get_logger()
 router = APIRouter(prefix="/bank-account", tags=["Bank Account"])
@@ -23,13 +25,14 @@ router = APIRouter(prefix="/bank-account", tags=["Bank Account"])
     "/statement/generate",
     response_model=StatementResponseSchema,
     status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[],
 )
 async def generate_statement(
     request: StatementRequestSchema,
-    current_user: CurrentUser,
+    current_user = Depends(require_permission(PermissionChoicesSchema.GENERATE_STATEMENT)),
     session: AsyncSession = Depends(get_session),
 ) -> StatementResponseSchema:
-    # API khởi tạo yêu cầu tạo sao kê (statement) bất đồng bộ bằng Celery
+    """API khởi tạo yêu cầu tạo sao kê (statement) bất đồng bộ bằng Celery"""
     try:
         # Kiểm tra ngày bắt đầu phải trước ngày kết thúc
         if request.start_date > request.end_date:
@@ -37,7 +40,7 @@ async def generate_statement(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Start date must be before end date",
+                    "message": "Ngày bắt đầu phải nhỏ hơn ngày kết thúc.",
                 },
             )
 
@@ -57,7 +60,7 @@ async def generate_statement(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail={
                         "status": "error",
-                        "message": "Account not found or doed not belong to you",
+                        "message": "Tài khoản không tồn tại hoặc không thuộc quyền sở hữu",
                     },
                 )
 
@@ -67,7 +70,7 @@ async def generate_statement(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail={
                         "status": "error",
-                        "message": "Cannot generate statement for inactive account",
+                        "message": "Không thể tạo sao kê cho tài khoản không hoạt động hoặc chưa kích hoạt",
                     },
                 )
 
@@ -90,7 +93,7 @@ async def generate_statement(
         # Trả về thông tin task để client theo dõi trạng thái xử lý
         return StatementResponseSchema(
             status="pending",
-            message="Statement generation initiated",
+            message="Đã khởi tạo yêu cầu tạo sao kê",
             task_id=result["task_id"],
             statement_id=result["statement_id"],
             generated_at=generated_at,
@@ -113,20 +116,20 @@ async def generate_statement(
 
     except Exception as e:
         # Lỗi hệ thống không xác định
-        logger.error(f"Failed to generate statement: {e}")
+        logger.error(f"FKhởi tạo yêu cầu tạo sao kê thất bại: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to generate statement",
-                "action": "Please try again later",
+                "message": "Khởi tạo yêu cầu tạo sao kê thất bại.",
+                "action": "Vui lòng thử lại sau!",
             },
         )
 
 
-@router.get("/statement/{statement_id}")
+@router.get("/statement/{statement_id}", dependencies=[Depends(require_permission(PermissionChoicesSchema.GENERATE_STATEMENT))])
 async def get_statement(statement_id: str) -> Response:
-    # API tải file sao kê PDF từ Redis theo statement_id
+    """API tải file sao kê PDF từ Redis theo statement_id"""
     try:
         # Sử dụng Redis backend của Celery để truy xuất file PDF
         redis_client = celery_app.backend.client
@@ -140,7 +143,7 @@ async def get_statement(statement_id: str) -> Response:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "status": "error",
-                    "message": "Statement not found or has expired",
+                    "message": "Sao kê không tồn tại hoặc đã hết hạn.",
                 },
             )
 
@@ -159,8 +162,8 @@ async def get_statement(statement_id: str) -> Response:
 
     except Exception as e:
         # Lỗi khi truy xuất hoặc trả file sao kê
-        logger.error(f"Failed to retrieve statement: {e}")
+        logger.error(f"Lỗi khi truy xuất hoặc trả file sao kê: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to retrieve statement"},
+            detail={"status": "error", "message": "Lỗi khi truy xuất hoặc trả file sao kê"},
         )

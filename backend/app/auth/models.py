@@ -4,13 +4,14 @@ from typing import TYPE_CHECKING, ClassVar
 from pydantic import computed_field
 from sqlalchemy import func, text
 from sqlalchemy.dialects import postgresql as pg
-from sqlmodel import Column, Field, Relationship
-from backend.app.auth.schema import BaseUserSchema, RoleChoicesSchema
+from sqlmodel import Column, Field, Relationship, Boolean
+from backend.app.auth.schema import BaseUserSchema
 if TYPE_CHECKING:
     from backend.app.user_profile.models import Profile
     from backend.app.next_of_kin.models import NextOfKin
     from backend.app.bank_account.models import BankAccount
     from backend.app.transaction.models import Transaction
+    from backend.app.user_role.models import UserRole
 
 class User(BaseUserSchema, table=True):
     __tablename__: ClassVar[str] = "users"
@@ -24,6 +25,7 @@ class User(BaseUserSchema, table=True):
     )
     hashed_password: str
     failed_login_attempts: int = Field(default=0, sa_type=pg.SMALLINT)
+    must_change_password: bool = Field(default=False, sa_column=Column(Boolean, nullable=False))
     last_failed_login: datetime | None = Field(
         default=None, sa_column=Column(pg.TIMESTAMP(timezone=True))
     )
@@ -47,6 +49,9 @@ class User(BaseUserSchema, table=True):
             onupdate=func.current_timestamp(),
         ),
     )
+    deleted_at: datetime | None = Field(
+        default=None, sa_column=Column(pg.TIMESTAMP(timezone=True))
+    )
     # Mối quan hệ một-một với Profile
     profile: "Profile" = Relationship(
         back_populates="user",
@@ -54,6 +59,11 @@ class User(BaseUserSchema, table=True):
             "uselist": False,
             "lazy": "selectin",
         },
+    )
+    # Mối quan hệ N - 1 với Role
+    user_roles: list["UserRole"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"lazy": "selectin"},
     )
     # Mối quan hệ một-nhiều với NextOfKin
     next_of_kins: list["NextOfKin"] = Relationship(back_populates="user")
@@ -81,8 +91,5 @@ class User(BaseUserSchema, table=True):
     @computed_field
     @property
     def full_name(self) -> str:
-        full_name = f"{self.first_name} {self.middle_name + ' ' if self.middle_name else ''}{self.last_name}"
+        full_name = f"{self.last_name} {self.middle_name + ' ' if self.middle_name else ''}{self.first_name}"
         return full_name.title().strip()
-
-    def has_role(self, role: RoleChoicesSchema) -> bool:
-        return self.role.value == role.value

@@ -1,16 +1,14 @@
-from typing import Any
+from typing import Any, cast
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from fastapi import HTTPException, status
-from sqlmodel import any_, desc, func, or_, select
+from sqlmodel import any_, col, desc, func, or_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
-
 from backend.app.auth.models import User
 from backend.app.auth.utils import generate_otp
 from backend.app.bank_account.enums import AccountStatusEnum
 from backend.app.bank_account.models import BankAccount
-from backend.app.bank_account.utils import calculate_conversion
 from backend.app.core.tasks.statement import generate_statement_pdf
 from backend.app.core.utils.number_format import format_currency
 from backend.app.transaction.utils import mark_transaction_failed
@@ -30,8 +28,9 @@ from backend.app.core.services.transfer_alert import send_transfer_alert
 from backend.app.core.services.withdrawal_alert import send_withdrawal_alert
 
 
-logger = get_logger()
 
+logger = get_logger()
+MAX_ADMIN_LIMIT = 200
 async def process_deposit(
     *,
     amount: Decimal,
@@ -54,7 +53,7 @@ async def process_deposit(
         if not account_user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"status": "error", "message": "Account not found"},
+                detail={"status": "error", "message": "Tài khoản không tồn tại"},
             )
 
         account, account_owner = account_user
@@ -62,7 +61,7 @@ async def process_deposit(
         if account.account_status != AccountStatusEnum.Active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"status": "error", "message": "Account is not active"},
+                detail={"status": "error", "message": "Tài khoản không hoạt động"},
             )
         # Sinh mã tham chiếu giao dịch
         reference = f"DEP{uuid.uuid4().hex[:8].upper()}"
@@ -83,7 +82,8 @@ async def process_deposit(
             receiver_id=account_owner.id,
             processed_by=teller_id,
             transaction_metadata={
-                "currency": account.currency,
+                "type": "deposit",
+                "currency": "VND",
                 "account_number": account.account_number,
             },
         )
@@ -95,7 +95,7 @@ async def process_deposit(
             transaction.transaction_metadata["teller_name"] = teller.full_name
             transaction.transaction_metadata["teller_email"] = teller.email
         # Cập nhật số dư tài khoản
-        account.balance = float(balance_after)
+        account.balance = balance_after
         # Hoàn tất giao dịch
         transaction.status = TransactionStatusEnum.Completed
         transaction.completed_at = datetime.now(timezone.utc)
@@ -108,10 +108,10 @@ async def process_deposit(
         raise
     except Exception as e:
         await session.rollback()
-        logger.error(f"Failed to process deposit: {e}")
+        logger.error(f"Lỗi khi nạp tiền: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to process deposit"},
+            detail={"status": "error", "message": "Lỗi khi nạp tiền"},
         )
 async def initiate_transfer(
     *,
@@ -137,7 +137,7 @@ async def initiate_transfer(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Cannot transfer to your own account",
+                    "message": "Không thể chuyển tiền vào tài khoản của chính mình",
                 },
             )
         # Lấy tài khoản và user người gửi
@@ -155,7 +155,7 @@ async def initiate_transfer(
         if not sender_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"status": "error", "message": "Sender account not found"},
+                detail={"status": "error", "message": "Tài khoản người gửi không tồn tại"},
             )
         # Phân tách dữ liệu người gửi
         sender_account, sender = sender_data
@@ -163,13 +163,13 @@ async def initiate_transfer(
         if sender_account.account_status != AccountStatusEnum.Active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"status": "error", "message": "Sender account is not active"},
+                detail={"status": "error", "message": "Tài khoản người gửi không hoạt động"},
             )
         # Kiểm tra câu trả lời bảo mật
         if security_answer != sender.security_answer:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail={"status": "error", "message": "Incorrect security answer"},
+                detail={"status": "error", "message": "Câu trả lời bảo mật không chính xác"},
             )
         # Lấy tài khoản và user người nhận
         receiver_stmt = (
@@ -184,32 +184,31 @@ async def initiate_transfer(
         if not receiver_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"status": "error", "message": "Receiver account not found"},
+                detail={"status": "error", "message": "Tài khoản người nhận không tồn tại"},
             )
         receiver_account, receiver = receiver_data
         # Kiểm tra trạng thái tài khoản người nhận
         if receiver_account.account_status != AccountStatusEnum.Active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"status": "error", "message": "Receiver account is not active"},
+                detail={"status": "error", "message": "Tài khoản người nhận không hoạt động"},
             )
         # Kiểm tra số dư tài khoản người gửi
         if Decimal(str(sender_account.balance)) < amount:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"status": "error", "message": "Insufficient balance"},
+                detail={"status": "error", "message": "Số dư tài khoản người gửi không đủ"},
             )
-        # Xử lý chuyển đổi tiền tệ nếu khác loại tiền
-        if sender_account.currency != receiver_account.currency:
-            converted_amount, exchange_rate, conversion_fee = calculate_conversion(
-                amount,
-                sender_account.currency,
-                receiver_account.currency,
+        # Kiểm tra số tiền chuyển tối thiểu
+        formatted_amount = f"{settings.MIN_TRANSACTION_AMOUNT:,.0f}"
+        if Decimal(str(amount)) <= Decimal(str(settings.MIN_TRANSACTION_AMOUNT)):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "status": "error",
+                    "message": f"Số tiền chuyển phải lớn hơn {formatted_amount} VNĐ",
+                },
             )
-        else:
-            converted_amount = amount
-            exchange_rate = Decimal("1.0")
-            conversion_fee = Decimal("0")
         # Sinh mã tham chiếu giao dịch
         reference = f"TRF{uuid.uuid4().hex[:8].upper()}"
         # Tạo bản ghi giao dịch chuyển tiền
@@ -227,12 +226,8 @@ async def initiate_transfer(
             sender_id=sender.id,
             receiver_id=receiver.id,
             transaction_metadata={
-                "conversion_rate": str(exchange_rate),
-                "conversion_fee": str(conversion_fee),
-                "original_amount": str(amount),
-                "converted_amount": str(converted_amount),
-                "from_currency": sender_account.currency.value,
-                "to_currency": receiver_account.currency.value,
+                "type": "internal_transfer",
+                "currency": "VND",
             },
         )
         session.add(transaction)
@@ -248,11 +243,10 @@ async def initiate_transfer(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "This transaction has been "
-                    "flagged as potentially fraudulent. An "
-                    "account executive will review the "
-                    "transaction, before its either "
-                    "approved or rejected",
+                    "message": "Giao dịch này đã bị đánh dấu là có dấu hiệu gian lận. "
+                    "Một nhân viên quản lý tài khoản sẽ xem xét giao dịch "
+                    "trước khi quyết định phê duyệt hoặc từ chối.",
+                    "transaction_id": str(transaction.id),
                     "risk_analysis": {
                         "risk_score": risk_analysis["risk_score"],
                         "risk_factors": risk_analysis["risk_factors"],
@@ -275,10 +269,10 @@ async def initiate_transfer(
         raise
     except Exception as e:
         await session.rollback()
-        logger.error(f"Failed to initiate transfer: {e}")
+        logger.error(f"Lỗi xảy ra khi khởi tạo giao dịch: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to initiate transfer"},
+            detail={"status": "error", "message": "Lỗi xảy ra khi khởi tạo giao dịch"},
         )
     
 async def complete_transfer(
@@ -306,7 +300,7 @@ async def complete_transfer(
         if not transaction:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"status": "error", "message": "Transfer not found"},
+                detail={"status": "error", "message": "Giao dịch không tồn tại"},
             )
         # 2. Lấy thông tin tài khoản và người dùng liên quan
         sender_account = await session.get(BankAccount, transaction.sender_account_id)
@@ -327,11 +321,11 @@ async def complete_transfer(
                     "receiver_found": bool(receiver),
                 },
                 session=session,
-                error_message="Account information not found",
+                error_message="Thông tin tài khoản không tìm thấy",
             )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"status": "error", "message": "Account information not found"},
+                detail={"status": "error", "message": "Thông tin tài khoản không tìm thấy"},
             )
         # 3. Xác thực OTP người gửi
         if not sender or not sender.otp or sender.otp != otp:
@@ -340,11 +334,11 @@ async def complete_transfer(
                 reason=TransactionFailureReason.INVALID_OTP,
                 details={"provided_otp": otp},
                 session=session,
-                error_message="Invalid OTP",
+                error_message="Mã OTP không hợp lệ",
             )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail={"status": "error", "message": "Invalid OTP"},
+                detail={"status": "error", "message": "Mã OTP không hợp lệ"},
             )
         # Kiểm tra OTP hết hạn
         if (
@@ -363,11 +357,11 @@ async def complete_transfer(
                     "current_time": datetime.now(timezone.utc).isoformat(),
                 },
                 session=session,
-                error_message="OTP has expired",
+                error_message="Mã OTP đã hết hạn",
             )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail={"status": "error", "message": "OTP has expired"},
+                detail={"status": "error", "message": "Mã OTP đã hết hạn"},
             )
         # 4. Kiểm tra trạng thái tài khoản
         if sender_account and sender_account.account_status != AccountStatusEnum.Active:
@@ -376,13 +370,13 @@ async def complete_transfer(
                 reason=TransactionFailureReason.ACCOUNT_INACTIVE,
                 details={"account": "sender"},
                 session=session,
-                error_message="Sender account is no longer active",
+                error_message="Tài khoản người gửi không còn hoạt động",
             )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Sender account is no longer active",
+                    "message": "Tài khoản người gửi không còn hoạt động",
                 },
             )
         if (
@@ -394,13 +388,13 @@ async def complete_transfer(
                 reason=TransactionFailureReason.ACCOUNT_INACTIVE,
                 details={"account": "receiver"},
                 session=session,
-                error_message="Receiver account is no longer active",
+                error_message="Tài khoản người nhận không còn hoạt động",
             )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Receiver account is no longer active",
+                    "message": "Tài khoản người nhận không còn hoạt động",
                 },
             )
         if not sender_account:
@@ -421,11 +415,11 @@ async def complete_transfer(
                     ),
                 },
                 session=session,
-                error_message="Insufficient balance",
+                error_message="Số dư không đủ",
             )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"status": "error", "message": "Insufficient balance"},
+                detail={"status": "error", "message": "Số dư không đủ"},
             )
         # 6. Kiểm tra metadata giao dịch (dùng cho quy đổi tiền tệ)
         if not transaction.transaction_metadata:
@@ -434,34 +428,31 @@ async def complete_transfer(
                 reason=TransactionFailureReason.SYSTEM_ERROR,
                 details={"error": "Missing transaction metadata"},
                 session=session,
-                error_message="System error: Missing transaction metadata",
+                error_message="Lỗi hệ thống: Thieu du lieu giao dich",
             )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "System error: Missing transaction metadata",
+                    "message": "Lỗi hệ thống: Thieu du lieu giao dich",
                 },
             )
 
         if not transaction.transaction_metadata:
             raise ValueError("Transaction metadata is missing")
 
-        converted_amount = Decimal(transaction.transaction_metadata["converted_amount"])
+        converted_amount = transaction.amount
         # Thực hiện trừ tiền người gửi
-        sender_account.balance = float(
-            Decimal(str(sender_account.balance)) - transaction.amount
-        )
-
+        sender_account.balance -= transaction.amount
+        # Kiểm tra tài khoản người nhận tồn tại
         if not receiver_account:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"status": "error", "message": "Receiver account not found"},
+                detail={"status": "error", "message": "Tài khoản người nhận không tìm thấy"},
             )
         # 7. Cập nhật số dư tài khoản người nhận
-        receiver_account.balance = float(
-            Decimal(str(receiver_account.balance)) + converted_amount
-        )
+        receiver_account.balance += converted_amount
+        
         # 8. Cập nhật trạng thái giao dịch
         transaction.status = TransactionStatusEnum.Completed
         transaction.completed_at = datetime.now(timezone.utc)
@@ -484,7 +475,7 @@ async def complete_transfer(
         if not receiver:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"status": "error", "message": "Receiver not found"},
+                detail={"status": "error", "message": "Tài khoản người nhận không tìm thấy"},
             )
         return transaction, sender_account, receiver_account, sender, receiver
     # Xử lý lỗi nghiệp vụ (HTTPException)
@@ -499,13 +490,13 @@ async def complete_transfer(
                 reason=TransactionFailureReason.SYSTEM_ERROR,
                 details={"error": str(e)},
                 session=session,
-                error_message="A system error occurred",
+                error_message="Lỗi hệ thống đã xảy ra trong quá trình xử lý yêu cầu.",
             )
         await session.rollback()
-        logger.error(f"Failed to complete transfer: {e}")
+        logger.error(f"Lỗi hệ thống đã xảy ra trong quá trình xử lý yêu cầu: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to complete the transfer"},
+            detail={"status": "error", "message": "Lỗi hệ thống đã xảy ra trong quá trình xử lý yêu cầu."},
         )
 async def process_withdrawal(
     *,
@@ -543,7 +534,7 @@ async def process_withdrawal(
         if not account_user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"status": "error", "message": "Account or username not found"},
+                detail={"status": "error", "message": "Tài khoản hoặc người dùng không tìm thấy"},
             )
 
         account, user = account_user
@@ -552,7 +543,7 @@ async def process_withdrawal(
         if account.account_status != AccountStatusEnum.Active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"status": "error", "message": "Account is not active"},
+                detail={"status": "error", "message": "Tài khoản không còn hoạt động"},
             )
 
         # 3. Kiểm tra số dư
@@ -560,7 +551,7 @@ async def process_withdrawal(
         if balance_before < amount:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"status": "error", "message": "Insufficient balance"},
+                detail={"status": "error", "message": "Số dư không đủ"},
             )
 
         balance_after = balance_before - amount
@@ -600,8 +591,7 @@ async def process_withdrawal(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "This transaction has been flagged as potentially fraudulent "
-                               "and is pending manual review",
+                    "message": "Giao dịch có dấu hiệu bất thường và đang chờ nhân viên kiểm tra.",
                     "risk_analysis": {
                         "risk_score": risk_analysis["risk_score"],
                         "risk_factors": risk_analysis["risk_factors"],
@@ -610,7 +600,7 @@ async def process_withdrawal(
             )
 
         # 6. Trừ tiền & hoàn tất giao dịch
-        account.balance = float(balance_after)
+        account.balance = balance_after
         transaction.status = TransactionStatusEnum.Completed
         transaction.completed_at = datetime.now(timezone.utc)
 
@@ -632,10 +622,10 @@ async def process_withdrawal(
     # Xử lý lỗi hệ thống
     except Exception as e:
         await session.rollback()
-        logger.error(f"Failed to process withdrawal: {e}")
+        logger.error(f"Lỗi hệ thống đã xảy ra trong quá trình xử lý yêu cầu: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"status": "error", "message": "Failed to process withdrawal"},
+            detail={"status": "error", "message": "Lỗi hệ thống đã xảy ra trong quá trình xử lý yêu cầu."},
         )
 
 
@@ -658,20 +648,18 @@ async def get_user_transactions(
         account_stmt = select(BankAccount.id).where(BankAccount.user_id == user_id)
         result = await session.exec(account_stmt)
         account_ids = [account_id for account_id in result.all()]
-
+        # Query giao dịch liên quan đến user hoặc các tài khoản của user
         if not account_ids:
             return [], 0
 
-        # Query giao dịch liên quan đến user hoặc các tài khoản của user
         base_query = select(Transaction).where(
             or_(
                 Transaction.sender_id == user_id,
                 Transaction.receiver_id == user_id,
-                Transaction.sender_account_id == any_(account_ids),
-                Transaction.receiver_account_id == any_(account_ids),
+                col(Transaction.sender_account_id).in_(account_ids),
+                col(Transaction.receiver_account_id).in_(account_ids)
             )
         )
-
         # Áp dụng các điều kiện filter
         if start_date:
             base_query = base_query.where(Transaction.created_at >= start_date)
@@ -699,6 +687,7 @@ async def get_user_transactions(
         count_query = select(func.count()).select_from(base_query.subquery())
         total = await session.exec(count_query)
         total_count = total.first() or 0
+
 
         # Lấy danh sách giao dịch theo phân trang
         transactions = await session.exec(base_query.offset(skip).limit(limit))
@@ -736,15 +725,108 @@ async def get_user_transactions(
         return transaction_list, total_count
 
     except Exception as e:
-        logger.error(f"Error fetching user transactions: {e}")
+        logger.error(f"Lỗi hệ thống đã xảy ra trong quá trình xử lý yêu cầu: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to fetch transaction history",
-                "action": "Please try again later",
+                "message": "Lỗi hệ thống đã xảy ra trong quá trình xử lý yêu cầu",
+                "action": "Vui lòng thử lại sau",
             },
         )
+async def get_all_transactions(
+    session: AsyncSession,
+    skip: int = 0,
+    limit: int = 20,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    transaction_type: TransactionTypeEnum | None = None,
+    transaction_category: TransactionCategoryEnum | None = None,
+    transaction_status: TransactionStatusEnum | None = None,
+    min_amount: Decimal | None = None,
+    max_amount: Decimal | None = None,
+) -> tuple[list[Transaction], int]:
+    """Lấy TẤT CẢ giao dịch trong hệ thống (có phân trang & filter)."""
+    try:
+        # Query tất cả giao dịch - KHÔNG filter theo user
+        base_query = select(Transaction)
+        
+        # Áp dụng các điều kiện filter
+        if start_date:
+            base_query = base_query.where(Transaction.created_at >= start_date)
+        if end_date:
+            base_query = base_query.where(Transaction.created_at <= end_date)
+        if transaction_type:
+            base_query = base_query.where(
+                Transaction.transaction_type == transaction_type
+            )
+        if transaction_category:
+            base_query = base_query.where(
+                Transaction.transaction_category == transaction_category
+            )
+        if transaction_status:
+            base_query = base_query.where(Transaction.status == transaction_status)
+        if min_amount is not None:
+            base_query = base_query.where(Transaction.amount >= min_amount)
+        if max_amount is not None:
+            base_query = base_query.where(Transaction.amount <= max_amount)
+
+        # Sắp xếp theo thời gian mới nhất
+        base_query = base_query.order_by(desc(Transaction.created_at))
+
+        # Đếm tổng số giao dịch
+        count_query = select(func.count()).select_from(base_query.subquery())
+        total = await session.exec(count_query)
+        total_count = total.first() or 0
+
+        # Lấy danh sách giao dịch theo phân trang
+        transactions = await session.exec(base_query.offset(skip).limit(limit))
+        transaction_list = list(transactions.all())
+
+        # Load quan hệ
+        for transaction in transaction_list:
+            await session.refresh(
+                transaction,
+                ["sender", "receiver", "sender_account", "receiver_account"],
+            )
+            
+            transaction.transaction_metadata = transaction.transaction_metadata or {}
+            
+            sender_info = []
+            receiver_info = []
+            
+            if transaction.sender:
+                sender_info.append(transaction.sender.full_name)
+            if transaction.sender_account:
+                sender_info.append(f"({transaction.sender_account.account_number})")
+            
+            if transaction.receiver:
+                receiver_info.append(transaction.receiver.full_name)
+            if transaction.receiver_account:
+                receiver_info.append(f"({transaction.receiver_account.account_number})")
+            
+            # Gộp lại thành string
+            transaction.transaction_metadata["counterparty_name"] = (
+                f"{' '.join(sender_info) or 'N/A'} → {' '.join(receiver_info) or 'N/A'}"
+            )
+            transaction.transaction_metadata["counterparty_account"] = (
+                f"{transaction.sender_account.account_number if transaction.sender_account else 'N/A'} → "
+                f"{transaction.receiver_account.account_number if transaction.receiver_account else 'N/A'}"
+            )
+
+        return transaction_list, total_count
+
+    except Exception as e:
+        logger.error(f"Lỗi lấy tất cả giao dịch: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "status": "error",
+                "message": "Lỗi hệ thống đã xảy ra trong quá trình xử lý yêu cầu",
+                "action": "Vui lòng thử lại sau",
+            },
+        )
+        
 async def get_user_statement_data(
     user_id: uuid.UUID,
     start_date: datetime,
@@ -792,7 +874,7 @@ async def get_user_statement_data(
         return user_info, list(transactions)
 
     except Exception as e:
-        logger.error(f"Failed to get statement data for user {user_id}: {e}")
+        logger.error(f"Lỗi hệ thống đã xảy ra trong quá trình xử lý yêu cầu: {e}")
         raise
 async def prepare_statement_data(
     user_id: uuid.UUID,
@@ -829,7 +911,7 @@ async def prepare_statement_data(
             account = account_result.first()
 
             if not account:
-                raise ValueError("Account not found or does not belong to user")
+                raise ValueError("Tài khoản không tìm thấy hoặc không thuộc người dùng")
 
             accounts = [account]
         else:
@@ -838,7 +920,7 @@ async def prepare_statement_data(
             accounts = accounts_result.all()
 
         if not accounts:
-            raise ValueError("User has no bank accounts")
+            raise ValueError("Người dùng không có tài khoản")
 
         # 3. Chuẩn hóa thông tin tài khoản (FORMAT TIỀN)
         account_details = []
@@ -852,10 +934,7 @@ async def prepare_statement_data(
                     "account_name": acc.account_name,
                     "account_type": acc.account_type.value,
                     "currency": acc.currency.value,
-                    "balance": format_currency(
-                        acc.balance,
-                        acc.currency.value,
-                    ),
+                    "balance": format_currency(acc.balance),
                 }
             )
 
@@ -866,8 +945,8 @@ async def prepare_statement_data(
             select(Transaction)
             .where(
                 or_(
-                    Transaction.sender_account_id == any_(account_ids),
-                    Transaction.receiver_account_id == any_(account_ids),
+                    col(Transaction.sender_account_id).in_(account_ids),
+                    col(Transaction.receiver_account_id).in_(account_ids),
                 ),
                 Transaction.created_at >= start_date,
                 Transaction.created_at <= end_date,
@@ -900,7 +979,7 @@ async def prepare_statement_data(
                 if sender_account
                 else receiver_account.currency.value
                 if receiver_account
-                else "USD"
+                else "VND"
             )
 
             transaction_data.append(
@@ -910,10 +989,8 @@ async def prepare_statement_data(
                     "description": txn.description,
                     "transaction_type": txn.transaction_type.value,
                     "transaction_category": txn.transaction_category.value,
-                    "amount": format_currency(txn.amount, currency),
-                    "balance_after": format_currency(
-                        txn.balance_after, currency
-                    ),
+                    "amount": format_currency(txn.amount),
+                    "balance_after": format_currency(txn.balance_after),
                     "sender_account": (
                         sender_account.account_number if sender_account else None
                     ),
@@ -941,10 +1018,10 @@ async def prepare_statement_data(
         }
 
     except ValueError as e:
-        logger.error(f"Error preparing statement data: {e}")
+        logger.error(f"Lỗi hệ thống đã xảy ra trong quá trình xử lý yêu cầu: {e}")
         raise
     except Exception as e:
-        logger.error(f"Error preparing statement data: {e}")
+        logger.error(f"Lỗi hệ thống đã xảy ra trong quá trình xử lý yêu cầu: {e}")
         raise
 async def generate_user_statement(
     user_id: uuid.UUID,
@@ -974,7 +1051,7 @@ async def generate_user_statement(
 
         return {
             "status": "pending",
-            "message": "Statement generation initiated",
+            "message": "Đang bắt đầu tạo sao kê.",
             "statement_id": statement_id,
             "task_id": task.id,
         }
@@ -985,7 +1062,7 @@ async def generate_user_statement(
             detail={"status": "error", "message": str(e)},
         )
     except Exception as e:
-        logger.error(f"Failed to initiate statement generation: {e}")
+        logger.error(f"Lỗi hệ thống đã xảy ra trong quá trình xử lý yêu cầu: {e}")
         raise
 async def review_flagged_transaction(
     transaction_id: uuid.UUID,
@@ -1020,7 +1097,7 @@ async def review_flagged_transaction(
         if not transaction_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"status": "error", "message": "Transaction not found"},
+                detail={"status": "error", "message": "Giao dịch không tìm thấy"},
             )
 
         transaction, risk_score = transaction_data
@@ -1031,7 +1108,7 @@ async def review_flagged_transaction(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Transaction is not flagged for review",
+                    "message": "Giao dịch không được đánh dấu nghi ngờ gian lận",
                     "current_status": transaction.ai_review_status,
                 },
             )
@@ -1041,6 +1118,7 @@ async def review_flagged_transaction(
             # Reviewer xác nhận là gian lận
             transaction.ai_review_status = AIReviewStatusEnum.CONFIRMED_FRAUD
             transaction.status = TransactionStatusEnum.Failed
+            transaction.failed_reason = TransactionFailureReason.SUSPICIOUS_ACTIVITY.value
 
             risk_score.is_confirmed_fraud = True
             risk_score.reviewed_by = reviewer_id
@@ -1075,7 +1153,7 @@ async def review_flagged_transaction(
 
         return {
             "status": "success",
-            "message": "Transaction reviewed successfully",
+            "message": "Giao dịch đã được đánh giá",
             "transaction_id": str(transaction_id),
             "is_fraud": is_fraud,
             "review_status": transaction.ai_review_status,
@@ -1086,151 +1164,111 @@ async def review_flagged_transaction(
         raise
     # Lỗi hệ thống
     except Exception as e:
-        logger.error(f"Error reviewing transaction: {e}")
+        logger.error(f"Lỗi hệ thống đã xảy ra trong quá trình xử lý yêu cầu: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to review transaction",
+                "message": "Lỗi hệ thống đã xảy ra trong quá trình xử lý yêu cầu",
                 "action": "Please try again later",
             },
         )
-async def _complete_approved_transfer(transaction: Transaction, session: AsyncSession):
-    """Hoàn tất giao dịch CHUYỂN TIỀN đã được reviewer chấp thuận sau khi bị AI flag."""
+async def _complete_approved_transfer(
+    transaction: Transaction,
+    session: AsyncSession,
+):
+    """
+    Hoàn tất giao dịch CHUYỂN TIỀN đã được reviewer chấp thuận
+    (áp dụng cho hệ thống VND-only, không FX).
+    """
     try:
-        # 1. Load thông tin người gửi, người nhận và các tài khoản liên quan
+        # 1. Load entities liên quan
         sender = await session.get(User, transaction.sender_id)
         receiver = await session.get(User, transaction.receiver_id)
-
         sender_account = await session.get(BankAccount, transaction.sender_account_id)
         receiver_account = await session.get(
             BankAccount, transaction.receiver_account_id
         )
 
-        # 2. Validate dữ liệu bắt buộc (user / account)
-        # Nếu thiếu bất kỳ entity nào → dừng xử lý
+        # 2. Validate dữ liệu bắt buộc
         if not sender:
-            raise ValueError("Sender not found")
+            raise ValueError("Người gửi không tìm thấy")
         if not receiver:
-            raise ValueError("Receiver not found")
+            raise ValueError("Người nhận không tìm thấy")
         if not sender_account:
-            raise ValueError("Sender account not found")
+            raise ValueError("Tài khoản người gửi không tìm thấy")
         if not receiver_account:
-            raise ValueError("Receiver account not found")
+            raise ValueError("Tài khoản người nhận không tìm thấy")
 
-        # 3. Kiểm tra metadata giao dịch (bắt buộc với chuyển tiền quốc tế)
-        if not transaction.transaction_metadata:
-            raise ValueError("Transaction metadata is missing")
+        # 3. Kiểm tra số dư người gửi
+        sender_balance = Decimal(str(sender_account.balance))
+        if sender_balance < transaction.amount:
+            raise ValueError("Số dư không đủ")
 
-        converted_amount_str = transaction.transaction_metadata.get("converted_amount")
-
-        if not converted_amount_str:
-            raise ValueError("Converted amount is missing from metadata")
-
-        # 4. Parse số tiền đã quy đổi (string → Decimal)
-        try:
-            converted_amount = Decimal(converted_amount_str)
-        except (TypeError, ValueError):
-            raise ValueError(
-                f"Invalid converted amount format:{converted_amount_str}"
-            )
-        # 5. Kiểm tra số dư hiện tại của người gửi
-        current_sender_balance = Decimal(str(sender_account.balance))
-
-        if current_sender_balance < transaction.amount:
-            raise ValueError("Insufficient balance for transfer")
-
-        try:
-
-            # 6. Thực hiện cập nhật số dư hai tài khoản
-            sender_account.balance = float(
-                current_sender_balance - transaction.amount
-            )
-            receiver_account.balance = float(
-                Decimal(str(receiver_account.balance)) + converted_amount
-            )
-
-            # 7. Đánh dấu giao dịch hoàn tất
-            transaction.status = TransactionStatusEnum.Completed
-            transaction.completed_at = datetime.now(timezone.utc)
-
-            # 8. Persist thay đổi vào database
-            session.add(sender_account)
-            session.add(receiver_account)
-            session.add(transaction)
-
-            await session.commit()
-
-            # 9. Refresh entity sau khi commit
-            await session.refresh(transaction)
-            await session.refresh(sender_account)
-            await session.refresh(receiver_account)
-
-            # 10. Gửi thông báo giao dịch cho người gửi & người nhận
-
-            try:
-                await send_transfer_alert(
-                    sender_email=sender.email,
-                    receiver_email=receiver.email,
-                    sender_name=sender.full_name,
-                    receiver_name=receiver.full_name,
-                    sender_account_number=sender_account.account_number or "Uknown",
-                    receiver_account_number=receiver_account.account_number
-                    or "Unknown",
-                    amount=transaction.amount,
-                    converted_amount=converted_amount,
-                    sender_currency=sender_account.currency,
-                    receiver_currency=receiver_account.currency,
-                    exchange_rate=Decimal(
-                        transaction.transaction_metadata.get("conversion_rate", "1"),
-                    ),
-                    conversion_fee=Decimal(
-                        transaction.transaction_metadata.get("conversion_fee", "0"),
-                    ),
-                    description=transaction.description,
-                    reference=transaction.reference,
-                    transaction_date=transaction.completed_at
-                    or transaction.created_at,
-                    sender_balance=Decimal(str(sender_account.balance)),
-                    receiver_balance=Decimal(str(receiver_account.balance)),
-                )
-                logger.info(
-                    f"Successfully sent transfer approval notificatoin "
-                    f"for transaction {transaction.reference}"
-                )
-            except Exception as e:
-                # Lỗi gửi email chỉ log, không rollback giao dịch
-                logger.error(
-                    f"Failed to send transfer approval notification: {e}"
-                )
-
-        except Exception as e:
-            # 11. Lỗi trong quá trình cập nhật số dư hoặc commit
-            await session.rollback()
-            raise ValueError(f"Failed to process transfer: {str(e)}")
-    except ValueError as e:
-        # 12. Lỗi validation / nghiệp vụ
-        # → rollback và đánh dấu giao dịch thất bại
-        await session.rollback()
-        logger.error(
-            f"Validation error in _complete_approved_transfer: {e}"
+        # 4. Cập nhật số dư (atomic logic)
+        sender_account.balance = sender_balance - transaction.amount
+        receiver_account.balance = (
+            Decimal(str(receiver_account.balance)) + transaction.amount
         )
+
+        # 5. Hoàn tất giao dịch
+        transaction.status = TransactionStatusEnum.Completed
+        transaction.completed_at = datetime.now(timezone.utc)
+
+        session.add_all([sender_account, receiver_account, transaction])
+        await session.commit()
+
+        # 6. Refresh sau commit
+        await session.refresh(transaction)
+        await session.refresh(sender_account)
+        await session.refresh(receiver_account)
+
+        # 7. Gửi email thông báo (best-effort)
+        try:
+            await send_transfer_alert(
+                sender_email=sender.email,
+                receiver_email=receiver.email,
+                sender_name=sender.full_name,
+                receiver_name=receiver.full_name,
+                sender_account_number=sender_account.account_number or "Unknown",
+                receiver_account_number=receiver_account.account_number or "Unknown",
+                amount=transaction.amount,
+                description=transaction.description,
+                reference=transaction.reference,
+                transaction_date=transaction.completed_at,
+                sender_balance=sender_account.balance,
+                receiver_balance=receiver_account.balance,
+            )
+            logger.info(
+                f"Giao dịch chuyển khoản đã được phê duyệt và hoàn tất với mã tham chiếu {transaction.reference}."
+            )
+        except Exception as email_error:
+            logger.error(
+                f"Giao dịch chuyển khoản đã hoàn tất, tuy nhiên quá trình gửi email gặp lỗi: {email_error}."
+            )
+
+    except ValueError as e:
+        # Lỗi nghiệp vụ → đánh dấu FAILED
+        await session.rollback()
+        logger.error(f"Phát sinh lỗi nghiệp vụ trong giao dịch chuyển khoản đã được phê duyệt: {e}.")
+
         transaction.status = TransactionStatusEnum.Failed
         transaction.transaction_metadata = {
             **(transaction.transaction_metadata or {}),
             "failure_reason": str(e),
             "failed_at": datetime.now(timezone.utc).isoformat(),
         }
+
         session.add(transaction)
         await session.commit()
         raise
+
     except Exception as e:
-        # 13. Lỗi hệ thống không mong muốn
+        # Lỗi hệ thống
         await session.rollback()
-        logger.error(
-            f"Unexpected error in _complete_approved_transfer: {e}"
-        )
+        logger.error(f"Phát sinh lỗi hệ thống trong quá trình xử lý giao dịch chuyển khoản đã được phê duyệt: {e}.")
         raise
+
 async def _complete_approved_withdrawal(
     transaction: Transaction, session: AsyncSession
 ):
@@ -1244,19 +1282,17 @@ async def _complete_approved_withdrawal(
 
         # Validate dữ liệu bắt buộc
         if not user:
-            raise ValueError("User not found")
+            raise ValueError("Người dùng không tìm thấy")
         if not account:
-            raise ValueError("Account not found")
+            raise ValueError("Tài khoản không tìm thấy")
 
         # Kiểm tra số dư tài khoản trước khi rút
         if Decimal(str(account.balance)) < transaction.amount:
-            raise ValueError("Insufficient balance for withdrawal")
+            raise ValueError("Số dư không đủ")
 
         try:
             # Trừ tiền khỏi số dư tài khoản
-            account.balance = float(
-                Decimal(str(account.balance)) - transaction.amount
-            )
+            account.balance = Decimal(str(account.balance)) - transaction.amount
 
             # Cập nhật trạng thái giao dịch thành hoàn tất
             transaction.status = TransactionStatusEnum.Completed
@@ -1288,25 +1324,25 @@ async def _complete_approved_withdrawal(
                     balance=Decimal(str(account.balance)),
                 )
                 logger.info(
-                    f"Successfully sent withdrawal approval notificatoin "
-                    f"for transaction {transaction.reference}"
+                    f"Gửi thông báo rút tiền thành công cho người dùng "
+                    f"giao dịch rút tiền {transaction.reference}"
                 )
             except Exception as e:
                 # Lỗi gửi notification không ảnh hưởng đến giao dịch
                 logger.error(
-                    f"Failed to send withdrawal approval notification: {e}"
+                    f"Không thể gửi thông báo phê duyệt rút tiền: {e}"
                 )
 
         except Exception as e:
             # Lỗi xảy ra trong quá trình xử lý rút tiền
             await session.rollback()
-            raise ValueError(f"Failed to process withdrawal: {str(e)}")
+            raise ValueError(f"Xử lý yêu cầu rút tiền thất bại: {str(e)}")
 
     except ValueError as e:
         # Lỗi nghiệp vụ / validation
         await session.rollback()
         logger.error(
-            f"Validation error in _complete_approved_withdrawal: {e}"
+            f"Lỗi xác thực dữ liệu trong quá trình hoàn tất rút tiền đã được phê duyệt: {e}"
         )
 
         # Đánh dấu giao dịch thất bại và ghi lại lý do
@@ -1324,7 +1360,7 @@ async def _complete_approved_withdrawal(
         # Lỗi hệ thống không mong muốn
         await session.rollback()
         logger.error(
-            f"Unexpected error in _complete_approved_transfer: {e}"
+            f"Lỗi không xác định trong quá trình hoàn tất giao dịch chuyển khoản đã được phê duyệt: {e}"
         )
         raise
 async def get_user_risk_history(
@@ -1419,12 +1455,82 @@ async def get_user_risk_history(
 
     except Exception as e:
         # Xử lý lỗi hệ thống
-        logger.error(f"Error getting risk history: {e}")
+        logger.error(f"Lỗi khi lấy lịch sử rủi ro: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to retrieve risk history",
-                "action": "Please try again later",
+                "message": "Không thể lấy lịch sử rủi ro",
+                "action": "Vui lòng thử lại sau",
             },
         )
+
+async def get_all_risk_history_service(
+    session: AsyncSession,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    min_risk_score: float | None = None,
+    skip: int = 0,
+    limit: int = 20,
+):
+    base_stmt = (
+        select(Transaction, TransactionRiskScore)
+        .join(TransactionRiskScore)
+    )
+
+    if start_date:
+        base_stmt = base_stmt.where(
+            TransactionRiskScore.created_at >= start_date
+        )
+
+    if end_date:
+        base_stmt = base_stmt.where(
+            TransactionRiskScore.created_at <= end_date
+        )
+
+    if min_risk_score is not None:
+        base_stmt = base_stmt.where(
+            TransactionRiskScore.risk_score >= min_risk_score
+        )
+
+
+    total_stmt = (
+        select(func.count())
+        .select_from(base_stmt.subquery())
+    )
+    total = (await session.exec(total_stmt)).one()
+
+    data_stmt = (
+        base_stmt
+        .order_by(desc(TransactionRiskScore.created_at))
+        .offset(skip)
+        .limit(limit)
+    )
+
+    rows = (await session.exec(data_stmt)).all()
+
+    history: list[dict[str, Any]] = []
+    for transaction, risk_score in rows:
+        history.append(
+            {
+                "transaction_id": transaction.id,
+                "reference": transaction.reference,
+                "amount": str(transaction.amount),
+                "created_at": transaction.created_at,
+                "risk_score": risk_score.risk_score,
+                "risk_factors": risk_score.risk_factors,
+                "review_status": transaction.ai_review_status,
+                "is_confirmed_fraud": risk_score.is_confirmed_fraud,
+                "reviewed_by": risk_score.reviewed_by,
+                "review_details": (
+                    transaction.transaction_metadata.get("fraud_review")
+                    if transaction.transaction_metadata
+                    else None
+                ),
+            }
+        )
+
+    return history, total
+
+
+

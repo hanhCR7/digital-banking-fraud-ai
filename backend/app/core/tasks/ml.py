@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -66,19 +66,7 @@ def train_fraud_detection_model(
         end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=days_lookback)
         from backend.app.core.ml.training import ModelTrainer
-        def setup_models():
-            """
-            Import toàn bộ các model liên quan để:
-            - Đảm bảo SQLAlchemy đăng ký đầy đủ metadata
-            - Tránh lỗi lazy loading hoặc missing table trong quá trình training
-            """
-            from backend.app.auth.models import User
-            from backend.app.bank_account.models import BankAccount
-            from backend.app.core.ai.models import TransactionRiskScore
-            from backend.app.next_of_kin.models import NextOfKin
-            from backend.app.user_profile.models import Profile
-            from backend.app.virtual_card.models import VirtualCard
-            logger.info("Tất cả các thư viện/phụ thuộc của mô hình đã được tải thành công")
+        from backend.app.core.model_registry import load_models
         async def _train_model():
             """
             Hàm async thực hiện huấn luyện model:
@@ -87,8 +75,8 @@ def train_fraud_detection_model(
             - Train model và lưu metadata vào database + MLflow
             """
             async with async_session() as session:
-                # Load toàn bộ model trước khi thao tác DB
-                setup_models()
+                # Load toàn bộ SQLAlchemy models theo đúng thứ tự
+                load_models()
                 trainer = ModelTrainer(session)
                 # Thực hiện train model trong khoản thời gian chỉ định
                 model_record, metrics = await trainer.train_model(
@@ -134,18 +122,12 @@ def auto_deploy_best_model(
         logger.info("Đang tìm kiếm mô hình phát hiện gian lận tốt nhất để triển khai")
 
         from sqlmodel import desc, select
-
-        # Import các model để đảm bảo SQLAlchemy load đầy đủ metadata
-        from backend.app.auth.models import User
-        from backend.app.bank_account.models import BankAccount
-        from backend.app.core.ai.models import TransactionRiskScore
+        from backend.app.core.model_registry import load_models
         from backend.app.core.ml.deployment import ModelDeployer
         from backend.app.core.ml.models import MLModel, ModelStatusEnum
-        from backend.app.next_of_kin.models import NextOfKin
-        from backend.app.transaction.models import Transaction
-        from backend.app.user_profile.models import Profile
-        from backend.app.virtual_card.models import VirtualCard
 
+        # Load toàn bộ SQLAlchemy models theo đúng thứ tự trước khi truy vấn
+        load_models()
         async def _find_and_deploy_best_model():
             """
             Hàm async:

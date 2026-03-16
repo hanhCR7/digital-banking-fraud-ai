@@ -3,14 +3,16 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
+from sqlmodel.ext.asyncio.session import AsyncSession
 from backend.app.api.main import api_router
 from backend.app.core.config import settings
 from backend.app.core.db import engine, init_db
 from backend.app.core.health import ServiceStatus, health_checker
 from backend.app.core.logging import get_logger
 from backend.app.core.rate_limit.middleware import RateLimitMiddleware
+
 
 logger = get_logger()
 
@@ -47,9 +49,11 @@ async def startup_health_check(timeout: float = 90.0) -> bool:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
+        # Init DB (tables)
         await init_db()
         logger.info("Database initialized successfully")
 
+        # Register health checks
         await health_checker.add_service("database", health_checker.check_database)
         await health_checker.add_service("celery", health_checker.check_celery)
         await health_checker.add_service("redis", health_checker.check_redis)
@@ -58,18 +62,35 @@ async def lifespan(app: FastAPI):
             raise RuntimeError("Critical services failed to start")
 
         logger.info("All services initialized and healthy")
+
+        # SEED DATA HỆ THỐNG
+        async with AsyncSession(engine) as db:
+            from backend.app.core.bootstrap_rbac import (
+                seed_roles,
+                seed_permissions,
+                seed_role_permissions,
+            )
+
+            await seed_roles(db)
+            await seed_permissions(db)
+            await seed_role_permissions(db)
+            from backend.app.core.bootstrap import create_initial_admin_user
+            await create_initial_admin_user(db)
+
+        logger.info("System seed completed")
+
+        # App bắt đầu chạy
         yield
+
     except Exception as e:
         logger.error(f"Application startup failed: {e}")
-        await engine.dispose()
-        await health_checker.cleanup()
         raise
+
     finally:
         logger.info("Shutting down")
         await engine.dispose()
         await health_checker.cleanup()
-    await init_db()
-    yield
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -78,6 +99,20 @@ app = FastAPI(
     redoc_url=f"{settings.API_V1_STR}/redoc",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan,
+)
+
+app.add_middleware(RateLimitMiddleware)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 
@@ -102,5 +137,4 @@ async def health_check():
         )
 
 
-app.add_middleware(RateLimitMiddleware)
 app.include_router(api_router, prefix=settings.API_V1_STR)

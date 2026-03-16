@@ -11,7 +11,6 @@ class PermissionChoicesSchema(str, Enum):
     ACTIVATE_ACCOUNT = "activate_account"
     CREATE_DEPOSIT = "create_deposit"
     CREATE_WITHDRAWAL = "create_withdrawal"
-    
     # Card
     CREATE_VIRTUAL_CARD = "create_virtual_card"
     ACTIVATE_CARD = "activate_card"

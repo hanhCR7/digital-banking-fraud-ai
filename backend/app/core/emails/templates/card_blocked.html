@@ -1,44 +1,41 @@
 {% extends "base.html" %}
 
-{% block title %} Virtual Card Blocked {% endblock %}
+{% block title %} Thẻ ảo đã bị khóa {% endblock %}
 
-{% block header %} Your Virtual Card Has Been Blocked {% endblock %}
+{% block header %} Thẻ ảo của bạn đã bị khóa {% endblock %}
 
 {% block content %}
 
-<p>Dear {{ full_name }},</p>
+<p>Kính gửi {{ full_name }},</p>
 
-<p>For your security, your virtual card has been blocked.
-</p>
+<p>Vì lý do bảo mật, thẻ ảo của bạn đã bị khóa.</p>
 
 <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0;">
-  <h3 style="margin-top: 0;">Card Details:</h3>
+  <h3 style="margin-top: 0;">Thông tin thẻ:</h3>
 
   <ul style="list-style-type: none; padding-left: 0;">
-    <li style="margin: 10px 0;"><strong> Card Type: </strong> {{ card_type }}</li>
-    <li style="margin: 10px 0;"><strong> Card Number: </strong>{{ masked_card_number }}</li>
-    <li style="margin: 10px 0;"><strong> Block Reason: </strong> {{ block_reason }}</li>
-    <li style="margin: 10px 0;"><strong> Additional Informtion: </strong> {{ blocked_reason_description }}</li>
+    <li style="margin: 10px 0;"><strong>Loại thẻ:</strong> {{ card_type }}</li>
+    <li style="margin: 10px 0;"><strong>Số thẻ:</strong> {{ masked_card_number }}</li>
+    <li style="margin: 10px 0;"><strong>Lý do khóa:</strong> {{ block_reason }}</li>
+    <li style="margin: 10px 0;"><strong>Thông tin bổ sung:</strong> {{ blocked_reason_description }}</li>
 
-    <li style="margin: 10px 0;"><strong> Blocked At: </strong> {{ blocked_at }} </li>
-
-
+    <li style="margin: 10px 0;"><strong>Thời điểm khóa:</strong> {{ blocked_at }}</li>
   </ul>
 </div>
 
 <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
-  <p style="margin: 0;"><strong>Next Steps:</strong> You can: </p>
+  <p style="margin: 0;"><strong>Các bước tiếp theo:</strong> Bạn có thể:</p>
   <ul style="margin-top: 10px;">
-    <li>If you did not request this block, please contact our support team immediately.</li>
-    <li>To unblock your card, please visit our nearest branch with valid identification.</li>
-    <li>For additional assistance, contact our 24/7 support.</li>
+    <li>Nếu bạn không yêu cầu việc khóa thẻ này, vui lòng liên hệ ngay với bộ phận hỗ trợ.</li>
+    <li>Để mở khóa thẻ, vui lòng đến chi nhánh gần nhất và mang theo giấy tờ tùy thân hợp lệ.</li>
+    <li>Để được hỗ trợ thêm, vui lòng liên hệ bộ phận hỗ trợ 24/7.</li>
   </ul>
-
 </div>
 
 <div style="background-color: #e8f5e9; padding: 15px; border-radius: 5px; margin: 20px 0;">
-  <p style="margin: 0;">For your protection, any pending transactions may be declined while your card is blocked</p>
+  <p style="margin: 0;">
+    Để đảm bảo an toàn, các giao dịch đang chờ xử lý có thể bị từ chối trong thời gian thẻ của bạn bị khóa.
+  </p>
 </div>
-
 
 {% endblock %}

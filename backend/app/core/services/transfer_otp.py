@@ -5,7 +5,7 @@ from backend.app.core.emails.base import EmailTemplate
 class TransferOTPEmail(EmailTemplate):
     template_name = "transfer_otp.html"
     template_name_plain = "transfer_otp.txt"
-    subject = "Transfer Authorization OTP"
+    subject = "Mã OTP xác thực chuyển tiền"
 
 
 async def send_transfer_otp_email(email: str, otp: str) -> None:

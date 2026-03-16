@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Tuple
 from uuid import UUID
 
@@ -61,13 +62,13 @@ class TransactionAnalyzer:
         )
         # Giao dịch trong giờ hành chính
         if banking_hours[0] <= hour <= banking_hours[1]:
-            return ai_settings.BANKING_HOURS_RISK
+            return float(ai_settings.BANKING_HOURS_RISK)
         # Giao dịch vào giờ rất khuya hoặc rất sớm
         elif hour < 6 or hour > 22:
-            return ai_settings.LATE_HOURS_RISK
+            return float(ai_settings.LATE_HOURS_RISK)
         # Các khung giờ còn lại (ngoài giờ hành chính)
         else:
-            return ai_settings.OFF_HOURS_RISK
+            return float(ai_settings.OFF_HOURS_RISK)
     def _calculate_frequency(
         self,
         transaction: Transaction,
@@ -222,9 +223,11 @@ class TransactionAnalyzer:
         )
 
         # Chuẩn hóa tốc độ dòng tiền theo ngưỡng cấu hình
-        amount_velocity_score = min(
-            1.0,
-            total_volume / ai_settings.VELOCITY_THRESHOLD,
+        amount_velocity_score = float(
+            min(
+                1.0,
+                total_volume / float(ai_settings.VELOCITY_THRESHOLD),
+            )
         )
 
         # Nếu cả tần suất và khối lượng đều cao → rủi ro tối đa
@@ -257,11 +260,12 @@ class TransactionAnalyzer:
         base_risk = min(1.0, amount_ratio / 5)
 
         # Rủi ro tuyệt đối theo ngưỡng hệ thống
-        amount_risk = min(
-            1.0,
-            current_amount / ai_settings.HIGH_AMOUNT_THRESHOLD,
+        amount_risk = float(
+            min(
+                1.0,
+                current_amount / float(ai_settings.HIGH_AMOUNT_THRESHOLD),
+            )
         )
-
         # Lấy rủi ro lớn hơn để tránh bỏ sót giao dịch lớn bất thường
         return max(base_risk, amount_risk)
 
@@ -282,8 +286,8 @@ class TransactionAnalyzer:
         weights = ai_settings.TIME_RISK_WEIGHTS
 
         return (
-            time_of_day * weights["time_of_day"]
-            + day_of_week * weights["day_of_week"]
+            time_of_day * float(weights["time_of_day"])
+            + day_of_week * float(weights["day_of_week"])
         )
 
 

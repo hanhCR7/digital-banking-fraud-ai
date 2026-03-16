@@ -7,6 +7,8 @@ from backend.app.bank_account.schema import (
     BankAccountCreateSchema,
     BankAccountReadSchema,
 )
+from backend.app.api.services.security import require_permission
+from backend.app.permission.schema import PermissionChoicesSchema
 from backend.app.core.db import get_session
 from backend.app.core.logging import get_logger
 from backend.app.core.services.bank_account_created_email import (
@@ -23,13 +25,13 @@ router = APIRouter(prefix="/bank-account", tags=["Bank Account"])
     response_model=BankAccountReadSchema,
     status_code=status.HTTP_201_CREATED,
     description=(
-        "Create a new bank account. Requires completed profile and at least one next of kin. "
-        "Maximum 3 accounts per user"
+        "Tạo tài khoản ngân hàng mới. Yêu cầu hồ sơ cá nhân đã hoàn tất và có ít nhất một người thân (người thụ hưởng). "
+        "Giới hạn: Tối đa 3 tài khoản cho mỗi người dùng."
     ),
 )
 async def create_account(
     account_data: BankAccountCreateSchema,
-    current_user: CurrentUser,
+    current_user = Depends(require_permission(PermissionChoicesSchema.CREATE_ACCOUNT)),
     session: AsyncSession = Depends(get_session),
 ) -> BankAccountReadSchema:
     """
@@ -52,7 +54,7 @@ async def create_account(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail={
                         "status": "error",
-                        "message": "Account number not generated",
+                        "message": "Không thể tạo số tài khoản",
                     },
                 )
 
@@ -66,20 +68,20 @@ async def create_account(
                 identification_type=current_user.profile.means_of_identification.value,
             )
         except Exception as e:
-            logger.error(f"Failed to send account creation email: {e}")
-        logger.info(f"Created account for user {current_user.email}")
+            logger.error(f"Gửi email thông báo tạo tài khoản thất bại: {e}")
+        logger.info(f"Đã tạo tài khoản cho người dùng {current_user.email}")
         return BankAccountReadSchema.model_validate(account)
 
     except HTTPException as http_ex:
         raise http_ex
 
     except Exception as e:
-        logger.error(f"Failed to create account: {e}")
+        logger.error(f"Tạo tài khoản thất bại: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to create account",
-                "action": "Please try again later",
+                "message": "Tạo tài khoản thất bại!",
+                "action": "Vui lòng thử lại sau!",
             },
         )

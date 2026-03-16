@@ -8,7 +8,8 @@ from backend.app.api.services.card import delete_virtual_card
 from backend.app.core.db import get_session
 from backend.app.core.logging import get_logger
 from backend.app.virtual_card.schema import CardDeleteResponseSchema
-
+from backend.app.api.services.security import require_permission
+from backend.app.permission.schema import PermissionChoicesSchema
 logger = get_logger()
 router = APIRouter(prefix="/virtual-card", tags=["Virtual Card"])
 
@@ -17,11 +18,11 @@ router = APIRouter(prefix="/virtual-card", tags=["Virtual Card"])
     "/{card_id}",
     response_model=CardDeleteResponseSchema,
     status_code=status.HTTP_200_OK,
-    description="Delete a virtual card. Card must have zero balance and no physical card request",
+    description="Xóa mềm thẻ ảo. Thẻ phải có số dư bằng 0 và không có yêu cầu thẻ vật lý",
 )
 async def delete_card(
     card_id: UUID,
-    current_user: CurrentUser,
+    current_user = Depends(require_permission(PermissionChoicesSchema.DELETE_VIRTUAL_CARD)),
     session: AsyncSession = Depends(get_session),
 ) -> CardDeleteResponseSchema:
     # API xóa mềm thẻ ảo theo yêu cầu người dùng
@@ -36,7 +37,7 @@ async def delete_card(
         # Trả về kết quả xóa thẻ
         return CardDeleteResponseSchema(
             status="success",
-            message="Virtual card deleted successfully",
+            message="Thẻ ảo đã được xóa mềm.",
             deleted_at=result["deleted_at"],
         )
 
@@ -46,11 +47,11 @@ async def delete_card(
 
     except Exception as e:
         # Lỗi hệ thống không xác định
-        logger.error(f"Failed to delete card: {e}")
+        logger.error(f"Xóa mềm thẻ thất bại: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to delete virtual card",
+                "message": "Xóa mềm thẻ thất bại.",
             },
         )

@@ -41,9 +41,11 @@ celery_app.autodiscover_tasks(
     force=True,
 )
 
-celery_app.conf.beat_scheduler = "redisbeat.RedisScheduler"
+celery_app.conf.beat_scheduler = "celery.beat.PersistentScheduler"
+celery_app.conf.beat_schedule_filename = "/tmp/celerybeat-schedule"
 
-celery_app.conf.beat_scheduler = {
+
+celery_app.conf.beat_schedule = {
     #  Train model gian lận hàng ngày
     "train-fraud-model-daily": {
         "task": "train_fraud_detection_model",

@@ -5,7 +5,7 @@ from backend.app.core.emails.base import EmailTemplate
 class LoginOTPEmail(EmailTemplate):
     template_name = "login_otp.html"
     template_name_plain = "login_otp.txt"
-    subject = "Your Login OTP"
+    subject = "Mã OTP đăng nhập của bạn"
 
 
 async def send_login_otp_email(email: str, otp: str) -> None:

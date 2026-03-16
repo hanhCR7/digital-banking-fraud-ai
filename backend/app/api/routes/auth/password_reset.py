@@ -12,7 +12,7 @@ from backend.app.core.services.password_reset import send_password_reset_email
 
 logger = get_logger()
 
-router = APIRouter(prefix="/auth", tags=["Athentication"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/request-password-reset", status_code=status.HTTP_200_OK)
@@ -29,18 +29,18 @@ async def request_password_reset(
             await send_password_reset_email(user.email, user.id)
 
         return {
-            "message": "If an account exists with this email, "
-            "you will receive password reset instructions shortly "
+            "message": "Nếu có tài khoản tồn tại với email này, "
+            " bạn sẽ nhận được hướng dẫn đặt lại mật khẩu sớm "
         }
     except Exception as e:
-        logger.error(f"Password reset request failed: {e}")
+        logger.error(f"Yêu cầu đặt lại mật khẩu thất bại: {e}")
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to process password reset request.",
-                "action": "Please try again later",
+                "message": "Không thể xử lý yêu cầu đặt lại mật khẩu.",
+                "action": "Vui lòng thử lại sau.",
             },
         )
 
@@ -59,24 +59,24 @@ async def reset_password(
             reset_data.new_password,
             session,
         )
-        return {"message": "Password has been reset successfully"}
+        return {"message": "Mật khẩu đã được đặt lại thành công."}
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "status": "error",
                 "message": str(e),
-                "action": "Please request a new password reset link.",
+                "action": "Vui lòng yêu cầu một liên kết đặt lại mật khẩu mới.",
             },
         )
     except Exception as e:
 
-        logger.error(f"Password reset failed: {e}")
+        logger.error(f"Đặt lại mật khẩu thất bại: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to reset password.",
-                "action": "Please try again later.",
+                "message": "Không thể đặt lại mật khẩu.",
+                "action": "Vui lòng thử lại sau.",
             },
         )

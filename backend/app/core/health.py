@@ -45,7 +45,7 @@ class HealthCheck:
         for dep in depends_on:
             if dep not in self._services:
                 raise ValueError(
-                    f"Dependency '{dep}' not registered for service '{service_name}'"
+                    f"Phụ thuộc '{dep}' chưa được đăng ký cho dịch vụ '{service_name}'"
                 )
 
     async def add_service(
@@ -68,8 +68,9 @@ class HealthCheck:
             await self.validate_dependencies(service_name, depends_on)
             self._dependencies[service_name] = set(depends_on)
             logger.info(
-                f"Service '{service_name}' registered with dependencies: {depends_on}"
+                f"Dịch vụ '{service_name}' đã được đăng ký với các phụ thuộc: {depends_on}"
             )
+
 
     async def check_database(self) -> bool:
         try:
@@ -82,7 +83,7 @@ class HealthCheck:
                 self._last_check["database"] = datetime.now(timezone.utc)
                 return True
         except Exception as e:
-            logger.error(f"Database health check failed: {e}")
+            logger.error(f"Kiểm tra tình trạng CSDL thất bại: {e}")
             return False
 
     async def check_redis(self) -> bool:
@@ -92,7 +93,7 @@ class HealthCheck:
             self._last_check["redis"] = datetime.now(timezone.utc)
             return True
         except Exception as e:
-            logger.error(f"Redis health check failed: {e}")
+            logger.error(f"Kiểm tra tình trạng Redis thất bại: {e}")
             return False
 
     async def check_celery(self) -> bool:
@@ -104,7 +105,7 @@ class HealthCheck:
                 conn = celery_app.connection()
                 try:
                     conn.ensure_connection(max_retries=3)
-                    logger.warning("No celery workers found, but Rabbitmq is reachable")
+                    logger.warning("Không phát hiện worker Celery nào, nhưng RabbitMQ vẫn có thể kết nối")
                     self._last_check["celery"] = datetime.now(timezone.utc)
                     return True
                 finally:
@@ -113,7 +114,7 @@ class HealthCheck:
             self._last_check["celery"] = datetime.now(timezone.utc)
             return True
         except Exception as e:
-            logger.error(f"Celery health check failed: {e}")
+            logger.error(f"Kiểm tra tình trạng Celery thất bại: {e}")
             return False
 
     async def check_service_health(
@@ -125,12 +126,12 @@ class HealthCheck:
 
                 if dep_status != ServiceStatus.HEALTHY:
                     logger.error(
-                        f"Dependency {dep} not healthy for service {service_name}"
+                        f"Dịch vụ phụ thuộc '{dep}' không ở trạng thái tốt cho dịch vụ '{service_name}'"
                     )
                     return ServiceStatus.DEGRADED
 
         if service_name not in self._check_functions:
-            raise ValueError(f"Unknown service: {service_name}")
+            raise ValueError(f"Dịch vụ không xác định: {service_name}")
         check_func = self._check_functions[service_name]
         timeout = self._timeouts.get(service_name, 5.0)
         max_retries = self._max_retries[service_name]
@@ -151,7 +152,7 @@ class HealthCheck:
 
                             if attempt > 0:
                                 logger.info(
-                                    f"Service {service_name} recovered after {metrics['attempts']} attempts"
+                                    f"Dịch vụ '{service_name}' đã phục hồi sau {metrics['attempts']} lần thử"
                                 )
                         return ServiceStatus.HEALTHY
 
@@ -162,12 +163,12 @@ class HealthCheck:
                 metrics["last_error"] = f"Timout after {timeout}s"
                 if attempt == max_retries - 1:
                     logger.warning(
-                        f"Health check timeout for {service_name} after all retries"
+                        f"Kiểm tra tình trạng dịch vụ '{service_name}' bị timeout sau tất cả các lần thử lại"
                     )
             except Exception as e:
                 metrics["last_error"] = str(e)
                 if attempt == max_retries - 1:
-                    logger.error(f"Health check failed for {service_name}: {e}")
+                    logger.error(f"Kiểm tra tình trạng dịch vụ '{service_name}' thất bại: {e}")
 
             metrics["total_delay"] += retry_delay
             await asyncio.sleep(retry_delay)
@@ -175,7 +176,7 @@ class HealthCheck:
         async with self._lock:
             self._services[service_name] = ServiceStatus.UNHEALTHY
             logger.error(
-                f"Service {service_name} unhealthy after {max_retries} attempts: {metrics['last_error']}"
+                f"Dịch vụ '{service_name}' không hoạt động sau {max_retries} lần thử: {metrics['last_error']}"
             )
 
         return ServiceStatus.UNHEALTHY
@@ -230,7 +231,7 @@ class HealthCheck:
                 await asyncio.sleep(1)
             return False
         except Exception as e:
-            logger.error(f"Error waiting for services: {e}")
+            logger.error(f"Lỗi khi chờ các dịch vụ sẵn sàng: {e}")
             return False
 
     async def cleanup(self) -> None:

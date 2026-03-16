@@ -1,23 +1,23 @@
 {% extends "base.txt" %}
 
-{% block header %} Your Virtual Card Has Been Created {% endblock %}
+{% block header %} Thẻ Ảo Của Bạn Đã Được Tạo {% endblock %}
 
 {% block content %}
 
-Dear {{full_name}},
+Kính gửi {{ full_name }},
 
-Your virtual card has been created successfully and is pending activation. Here are your card details:
+Thẻ ảo của bạn đã được tạo thành công và hiện đang chờ kích hoạt. Dưới đây là thông tin chi tiết về thẻ của bạn:
   
-  Card Type: {{ card_type }}
-  Card Currency: {{ currency }}
-  Card Number: {{ masked_card_number }}
-  Name on Card: {{ name_on_card }}
+  Loại thẻ: {{ card_type }}
+  Loại tiền tệ: {{ currency }}
+  Số thẻ: {{ masked_card_number }}
+  Tên in trên thẻ: {{ name_on_card }}
 
-  Daily Limit: {{ currency }} {{ daily_limit }}
-  Monthly Limit: {{ currency }} {{ monthly_limit }}
+  Hạn mức giao dịch trong ngày: {{ currency }} {{ daily_limit }}
+  Hạn mức giao dịch trong tháng: {{ currency }} {{ monthly_limit }}
 
-IMPORTANT: Your card is currently inactive. Our account executives will review
-    and activate your card shortly. You'll receive another email once your card is activated and ready for use.
+QUAN TRỌNG: Thẻ của bạn hiện đang **chưa được kích hoạt**. Đội ngũ quản lý tài khoản của chúng tôi sẽ xem xét
+và kích hoạt thẻ trong thời gian sớm nhất. Bạn sẽ nhận được email tiếp theo khi thẻ đã được kích hoạt và sẵn sàng sử dụng.
 
-For security reasons, your card's CVV will be provided separetely upon activation.
+Vì lý do bảo mật, mã CVV của thẻ sẽ được cung cấp riêng sau khi thẻ được kích hoạt.
 {% endblock %}

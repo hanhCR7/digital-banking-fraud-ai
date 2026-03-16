@@ -1,11 +1,11 @@
 from datetime import date
-
+from decimal import Decimal
 from pydantic import field_validator
 from pydantic_extra_types.country import CountryShortName
 from pydantic_extra_types.phone_numbers import PhoneNumber
 from sqlmodel import Field, SQLModel
 
-from backend.app.auth.schema import RoleChoicesSchema
+from backend.app.role.schema import RoleChoicesSchema
 from backend.app.user_profile.enums import (
     EmploymentStatusEnum,
     GenderEnum,
@@ -37,7 +37,7 @@ class ProfileBaseSchema(SQLModel):
     employer_address: str
     employer_city: str
     employer_country: CountryShortName
-    annual_income: float
+    annual_income: Decimal = Field(max_digits=15, decimal_places=0)
     date_of_employment: date
     profile_photo_url: str | None = Field(default=None)
     id_photo_url: str | None = Field(default=None)

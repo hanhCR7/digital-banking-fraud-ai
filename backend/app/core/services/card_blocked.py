@@ -7,7 +7,7 @@ from backend.app.core.emails.base import EmailTemplate
 class VirtualCardBlockedEmail(EmailTemplate):
     template_name = "card_blocked.html"
     template_name_plain = "card_blocked.txt"
-    subject = "Your Virtual Card Has Been Blocked"
+    subject = "Thẻ ảo của bạn đã bị khóa"
 
 
 async def send_card_blocked_email(

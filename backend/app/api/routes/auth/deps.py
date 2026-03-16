@@ -1,7 +1,7 @@
 from typing import Annotated
 
 import jwt
-from fastapi import Cookie, Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from backend.app.auth.models import User
@@ -12,18 +12,30 @@ from backend.app.core.logging import get_logger
 logger = get_logger()
 
 
+def _extract_access_token(request: Request) -> str | None:
+    """Lấy access token từ cookie hoặc header Authorization: Bearer (SPA thường gửi Bearer)."""
+    token = request.cookies.get(settings.COOKIE_ACCESS_NAME)
+    if token:
+        return token
+    auth = request.headers.get("Authorization")
+    if auth and auth.startswith("Bearer "):
+        return auth[7:].strip()
+    return None
+
+
 async def get_current_user(
+    request: Request,
     session: AsyncSession = Depends(get_session),
-    access_token: str | None = Cookie(None, alias=settings.COOKIE_ACCESS_NAME),
 ) -> User:
-    """Xác thực người dùng hiện tại từ access token trong cookie"""
+    """Xác thực người dùng từ access token (cookie hoặc Authorization: Bearer)."""
+    access_token = _extract_access_token(request)
     if not access_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
                 "status": "error",
-                "message": "Not Authenticated",
-                "action": "Please login to access this resource",
+                "message": "Không xác thực được.",
+                "action": "Vui lòng đăng nhập để truy cập tài nguyên.",
             },
         )
 
@@ -38,8 +50,8 @@ async def get_current_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
                     "status": "error",
-                    "message": "Invalid token type",
-                    "action": "Please login to access this resource",
+                    "message": "Token không hợp lệ.",
+                    "action": "Vui lòng đăng nhập để truy cập tài nguyên.",
                 },
             )
 
@@ -51,8 +63,8 @@ async def get_current_user(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "status": "error",
-                    "message": "User not found",
-                    "action": "Please login again",
+                    "message": "Người dùng không tồn tại.",
+                    "action": "Vui lòng đăng nhập lại.",
                 },
             )
         await user_auth_service.validate_user_status(user)
@@ -63,8 +75,8 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
                 "status": "error",
-                "message": "Token has expired",
-                "action": "Please log in again",
+                "message": "Token đã hết hạn.",
+                "action": "Vui lòng đăng nhập lại.",
             },
         )
     except jwt.InvalidTokenError:
@@ -72,8 +84,8 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
                 "status": "error",
-                "message": "Invalid token",
-                "action": "Please log in again",
+                "message": "Token không hợp lệ.",
+                "action": "Vui lòng đăng nhập lại.",
             },
         )
     except Exception as e:
@@ -82,8 +94,8 @@ async def get_current_user(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Authentication failed",
-                "action": "Please try again later",
+                "message": "Xác thực thất bại.",
+                "action": "Vui lòng thử lại sau.",
             },
         )
 

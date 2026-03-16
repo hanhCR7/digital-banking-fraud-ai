@@ -19,6 +19,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy import desc
 
 from backend.app.core.logging import get_logger
 from backend.app.core.ml.config import ml_settings
@@ -334,7 +335,11 @@ class ModelTrainer:
                 # Xác định version cho model mới
                 try:
                     version_num = 1
-                    stmt = select(MLModel).order_by("created_at desc").limit(1)
+                    stmt = (
+                        select(MLModel)
+                        .order_by(desc(MLModel.created_at))
+                        .limit(1)
+                    )
                     result = await self.session.exec(stmt)
                     latest_model = result.first()
 

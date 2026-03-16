@@ -1,4 +1,6 @@
 import uuid
+from sqlalchemy import ColumnElement
+from typing import cast
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -17,12 +19,24 @@ class PermissionService:
         stmt = (
             select(Permission.code)
             .select_from(UserRole)
-            .join(RolePermission)
-            .join(Permission)
+            .join_from(
+                UserRole,
+                RolePermission,
+                cast(
+                    ColumnElement,
+                    RolePermission.role_code == UserRole.role_code,
+                ),
+            )
+            .join_from(
+                RolePermission,
+                Permission,
+                cast(
+                    ColumnElement,
+                    Permission.code == RolePermission.permission_code,
+                ),
+            )
             .where(
                 UserRole.user_id == user_id,
-                RolePermission.role_code == UserRole.role_code,
-                Permission.code == RolePermission.permission_code,
             )
             .distinct()
         )

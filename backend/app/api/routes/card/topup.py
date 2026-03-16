@@ -11,7 +11,8 @@ from backend.app.core.db import get_session
 from backend.app.core.logging import get_logger
 from backend.app.transaction.models import IdempotencyKey
 from backend.app.virtual_card.schema import CardTopUpResponseSchema, CardTopUpSchema
-
+from backend.app.api.services.security import require_permission
+from backend.app.permission.schema import PermissionChoicesSchema
 logger = get_logger()
 router = APIRouter(prefix="/virtual-card", tags=["Virtual Card"])
 
@@ -21,14 +22,14 @@ def validate_uuid4(value: str) -> str:
     try:
         uuid_obj = UUID(value, version=4)
         if str(uuid_obj) != value.lower():
-            raise ValueError("Not a valid UUID v4")
+            raise ValueError("Không phải là UUID v4 hợp lệ")
         return value
     except (ValueError, AttributeError, TypeError):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "status": "error",
-                "message": "Idempotency-Key must be a valid UUID v4",
+                "message": "Idempotency-Key phải là UUID v4 hợp lệ",
             },
         )
 
@@ -37,14 +38,14 @@ def validate_uuid4(value: str) -> str:
     "/{card_id}/top-up",
     response_model=CardTopUpResponseSchema,
     status_code=status.HTTP_200_OK,
-    description="Top up a virtual card from a bank account. Card must be active",
+    description="Nạp tiền vào thẻ ảo từ tài khoản ngân hàng. Thẻ phải hoạt động",
 )
 async def top_up_card(
     card_id: UUID,
     top_up_data: CardTopUpSchema,
-    current_user: CurrentUser,
+    current_user = Depends(require_permission(PermissionChoicesSchema.TOP_UP_CARD)),
     session: AsyncSession = Depends(get_session),
-    idempotency_key: str = Header(description="Idempotency key for the top-up request"),
+    idempotency_key: str = Header(description="Idempotency key cho yêu cầu nạp tiền."),
 ) -> CardTopUpResponseSchema:
     # API nạp tiền từ tài khoản ngân hàng vào thẻ ảo (có hỗ trợ idempotency)
     try:
@@ -55,7 +56,7 @@ async def top_up_card(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "status": "error",
-                    "message": "Idempotency-Key header is required",
+                    "message": "Idempotency-Key header là bắt buộc",
                 },
             )
 
@@ -74,7 +75,7 @@ async def top_up_card(
         if existing_key:
             return CardTopUpResponseSchema(
                 status="success",
-                message="Retrieved from cache",
+                message="Dữ liệu được lấy nhanh từ hệ thống lưu tạm.",
                 data=existing_key.response_body,
             )
 
@@ -90,7 +91,7 @@ async def top_up_card(
         # Tạo response trả về cho client
         response = CardTopUpResponseSchema(
             status="success",
-            message="Card topped up successfully",
+            message="Nạp tiền vào thẻ thành công.",
             data={
                 "card_id": str(card.id),
                 "transaction_id": str(transaction.id),
@@ -121,11 +122,11 @@ async def top_up_card(
 
     except Exception as e:
         # Lỗi hệ thống không xác định
-        logger.error(f"Failed to top up card: {e}")
+        logger.error(f"Nạp tiền vào thẻ thất bại: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "status": "error",
-                "message": "Failed to top up card",
+                "message": "Nạp tiền vào thẻ thất bại.",
             },
         )

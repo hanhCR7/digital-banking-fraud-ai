@@ -33,10 +33,10 @@ def upload_profile_image_task(
 ) -> UploadResponse:
     """Task bất đồng bộ dùng để upload ảnh hồ sơ người dùng lên Cloudinary."""
     try:
-        logger.info(f"Starting image upload for user {user_id}, type: {image_type}")
+        logger.info(f"Bắt đầu upload ảnh cho người dùng '{user_id}', loại ảnh: {image_type}")
         # Kiểm tra định dạng file upload (chỉ cho phép các MIME type hợp lệ)
         if content_type not in settings.ALLOWED_MIME_TYPES:
-            error_msg = f"Invalid file type: {content_type}. Allowed types: {', '.join(settings.ALLOWED_MIME_TYPES)}"
+            error_msg = f"Định dạng file không hợp lệ: {content_type}. Các định dạng được phép: {', '.join(settings.ALLOWED_MIME_TYPES)}"
             logger.error(error_msg)
             raise ValueError(error_msg)
         # Kiểm tra dung lượng file upload để tránh quá tải hệ thống
@@ -44,7 +44,7 @@ def upload_profile_image_task(
         max_size_mb = settings.MAX_FILE_SIZE / (1024 * 1024)
 
         if file_size_mb > max_size_mb:
-            error_msg = f"File too large: {file_size_mb:.2f}MB. Maximum allowed: {max_size_mb}MB"
+            error_msg = f"File quá lớn: {file_size_mb:.2f}MB. Dung lượng tối đa cho phép: {max_size_mb}MB"
             logger.error(error_msg)
             raise ValueError(error_msg)
         # Cấu hình upload ảnh lên Cloudinary:
@@ -66,18 +66,18 @@ def upload_profile_image_task(
             "fetch_format": "auto",
         }
 
-        logger.debug(f"Uploading image with options: {upload_options}")
+        logger.debug(f"Đang upload ảnh với cấu hình: {upload_options}")
         # Thực hiện upload ảnh lên Cloudinary
         result = cloudinary.uploader.upload(
             file_data,
             **upload_options,
         )
 
-        logger.debug(f"Cloudinary upload result: {result}")
+        logger.debug(f"Kết quả upload từ Cloudinary: {result}")
 
         if not result.get("secure_url"):
             raise Exception(
-                "Upload successful but secure URL not received from Cloudinary"
+                "Tải lên thành công nhưng không nhận được URL an toàn từ Cloudinar"
             )
         # Chuẩn hoá dữ liệu trả về cho backend (URL gốc + thumbnail)
         response: UploadResponse = {
@@ -94,27 +94,27 @@ def upload_profile_image_task(
         # Kiểm tra các trường bắt buộc trong response upload
         for key in ["url", "image_type", "public_id"]:
             if not response.get(key):
-                raise Exception(f"Required firld {key} missiong in upload response")
+                raise Exception(f"Thiếu trường bắt buộc '{key}' trong dữ liệu phản hồi upload")
 
         logger.info(
-            f"Successfully uploaded {image_type} image for user {user_id}."
+            f"Upload ảnh '{image_type}' cho người dùng '{user_id}' thành công. "
             f"URL: {response['url']}, "
-            f"Thumbnail: {response.get('thumbnail_url', 'No thumbnail')}, "
+            f"Thumbnail: {response.get('thumbnail_url', 'Không có thumbnail')}, "
             f"Public ID: {response['public_id']}"
         )
         return response
     except ValueError as e:
-        logger.error(f"Validation error in profile image upload: {str(e)}")
+        logger.error(f"Lỗi xác thực dữ liệu khi upload ảnh hồ sơ: {e}")
         raise
     except Exception as e:
         attempt = self.request.retries + 1
         logger.error(
-            f"Error uploading profile image (attempt {attempt}/{self.max_retries + 1}): {str(e)}"
+            f"Lỗi khi upload ảnh hồ sơ (lần thử {attempt}/{self.max_retries + 1}): {e}"
         )
         # Nếu đã đạt số lần retry tối đa, ghi log lỗi cuối cùng
         if attempt > self.max_retries:
             logger.error(
-                f"Final upload attempt failed for the user {user_id}, "
-                f"image_type {image_type}: {str(e)}"
+                f"Lần upload cuối cùng thất bại cho người dùng '{user_id}', "
+                f"loại ảnh '{image_type}': {e}"
             )
         raise self.retry(exc=e)

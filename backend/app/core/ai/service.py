@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -32,21 +33,13 @@ class TransactionAIService:
         # Service inference model AI
         self.model_inference = ModelInference(session)
 
-    async def analyze_transaction(
-        self, transaction: Transaction, user_id: UUID
-    ) -> dict:
-        """
-        Phân tích một giao dịch để xác định mức độ rủi ro gian lận
-        :param transaction: Giao dịch cần phân tích
-        :param user_id: ID người dùng thực hiện giao dịch
-        :return: Kết quả phân tích rủi ro
-        """
+    async def analyze_transaction(self, transaction: Transaction, user_id: UUID) -> dict:
+        """Phân tích một giao dịch để xác định mức độ rủi ro gian lận"""
         try:
             # Gọi model AI để dự đoán xác suất gian lận
             fraud_probability, prediction_details = (
                 await self.model_inference.predict_fraud(transaction)
             )
-
             # Tạo bản ghi risk score cho giao dịch
             risk_score = TransactionRiskScore(
                 transaction_id=transaction.id,
@@ -56,22 +49,18 @@ class TransactionAIService:
                 # Version model dùng để dự đoán
                 ai_model_version=prediction_details.get("model_version", "unknown"),
             )
-
             # Lưu risk score vào database
             self.session.add(risk_score)
-
             # Cập nhật trạng thái và mức độ rủi ro của giao dịch
             await update_transaction_risk(
                 transaction=transaction,
                 fraud_probability=fraud_probability,
-                risk_threshold=ai_settings.RISK_SCORE_THRESHOLD,
+                risk_threshold=float(ai_settings.RISK_SCORE_THRESHOLD),
                 prediction_details=prediction_details,
                 session=self.session,
             )
-
             # Kiểm tra giao dịch có vượt ngưỡng rủi ro hay không
-            needs_review = fraud_probability >= ai_settings.RISK_SCORE_THRESHOLD
-
+            needs_review = Decimal(str(fraud_probability)) >= ai_settings.RISK_SCORE_THRESHOLD
             # Kết quả trả về cho client/API
             response = {
                 "risk_score": fraud_probability,
@@ -88,7 +77,6 @@ class TransactionAIService:
                     "is_fallback": prediction_details.get("is_fallback", False),
                 },
             }
-
             # Log cảnh báo nếu phát hiện giao dịch rủi ro cao
             if needs_review:
                 logger.warning(
@@ -96,13 +84,10 @@ class TransactionAIService:
                     f"Score: {fraud_probability}, "
                     f"Factors: {prediction_details.get('risk_factors', {})}"
                 )
-
             return response
-
         except Exception as e:
             # Log lỗi khi phân tích giao dịch thất bại
             logger.error(f"Lỗi khi phân tích giao dịch: {e}")
-
             # Fallback response để đảm bảo hệ thống an toàn
             return {
                 "risk_score": 0.8,                 # Điểm rủi ro mặc định cao

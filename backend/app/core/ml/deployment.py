@@ -7,6 +7,7 @@ from mlflow.sklearn import load_model
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from backend.app.core.ai.config import ai_settings
 from backend.app.core.ai.enums import AIReviewStatusEnum
 from backend.app.core.logging import get_logger
 from backend.app.core.ml.config import ml_settings
@@ -238,19 +239,29 @@ class ModelInference:
         - Điều chỉnh rủi ro theo thời gian thực hiện giao dịch
         - Trả về kết quả đơn giản, an toàn để đảm bảo hệ thống không bị gián đoạn
         """           
-        # Giá trị tiền giao dịch
+        # Giá trị tiền giao dịch (VND)
         amount = float(transaction.amount)
-        # Ứng lượng xác suất gian lận dựa trên ngưỡng số tiền 
-        if amount > 10000:
+        # Dùng ngưỡng từ cấu hình AI để tránh hard-code ngưỡng quá thấp
+        high_amount_threshold = float(ai_settings.HIGH_AMOUNT_THRESHOLD)
+        medium_amount_threshold = high_amount_threshold * 0.5
+        low_amount_threshold = high_amount_threshold * 0.1
+        if amount >= high_amount_threshold:
             fraud_probability = 0.7
-        elif amount > 5000:
+        elif amount >= medium_amount_threshold:
             fraud_probability = 0.5
-        elif amount > 1000:
+        elif amount >= low_amount_threshold:
             fraud_probability = 0.3
         else:
             fraud_probability = 0.1
         # Lưu các yếu tố rủi ro dùng cho giải thích kết quả
-        risk_factors = {"amount": amount}
+        risk_factors = {
+            "amount": amount,
+            "amount_thresholds": {
+                "low": low_amount_threshold,
+                "medium": medium_amount_threshold,
+                "high": high_amount_threshold,
+            },
+        }
         # Giờ thực hiện giao dịch 
         hour = transaction.created_at.hour
         # Kiểm tra giao dịch có nằm trong giờ hành chính hay không 
