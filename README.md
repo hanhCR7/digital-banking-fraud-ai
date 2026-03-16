@@ -1,12 +1,12 @@
-# NextGen Bank — Hệ Thống Ngân Hàng Thế Hệ Mới
+# Bamboo Bank — Hệ Thống Ngân Hàng Thế Hệ Mới
 
-> **Project Cá Nhân** — Xây dựng nền tảng ngân hàng số hiện đại tích hợp mô hình Machine Learning phát hiện gian lận giao dịch theo thời gian thực.
+> **Project Cá Nhân** — Xây dựng nền tảng ngân hàng số hiện đại tích hợp mô hình Machine Learning phát hiện gian lận giao dịch.
 
 ---
 
 ## 📋 Mục Tiêu Dự Án
 
-NextGen Bank là một hệ thống API ngân hàng số được xây dựng nhằm:
+Bamboo Bank là một hệ thống API ngân hàng số được xây dựng nhằm:
 
 - **Cung cấp dịch vụ ngân hàng cốt lõi** — Đăng ký/đăng nhập, quản lý tài khoản, gửi tiền, rút tiền, chuyển tiền nội bộ, lịch sử giao dịch, sao kê.
 - **Quản lý thẻ ảo (Virtual Card)** — Phát hành, kích hoạt, khóa, nạp tiền và hủy thẻ ảo.
@@ -37,7 +37,7 @@ NextGen Bank là một hệ thống API ngân hàng số được xây dựng nh
 | Thành phần | Công nghệ |
 |---|---|
 | **ML Model** | Gradient Boosting (scikit-learn 1.6) |
-| **ML Experiment Tracking** | [MLflow](https://mlflow.org/) 2.20 |
+| **ML Experiment Tracking** | [MLflow](https://mlflow.org/) 2.11.1 |
 | **Data Processing** | Pandas, NumPy, SciPy |
 | **Visualization** | Matplotlib |
 
@@ -105,7 +105,7 @@ Mô hình Gradient Boosting chấm điểm rủi ro
 | `POST /api/v1/ml/train` | Huấn luyện mô hình mới từ dữ liệu hiện có |
 | `POST /api/v1/ml/deploy` | Triển khai thủ công một mô hình theo ID |
 | `POST /api/v1/ml/auto-deploy` | Tự động chọn và triển khai mô hình tốt nhất |
-| `GET /api/v1/transaction/fraud-review` | Xem danh sách giao dịch bị gắn cờ |
+| `POST /api/v1/transaction/{transaction_id}/review` | Xem xét giao dịch bị gắn cờ |
 | `GET /api/v1/transaction/risk-history` | Lịch sử điểm rủi ro của giao dịch |
 
 ---
@@ -126,7 +126,7 @@ src/
 │   ├── docker/             # Dockerfile cho từng môi trường
 │   └── requirements.txt
 ├── frontend/
-│   └── nextgen_banking/    # Ứng dụng React (Next.js)
+│   └── nextgen_banking/    # Ứng dụng React (CRA)
 ├── migrations/             # Alembic DB migrations
 ├── local.yml               # Docker Compose (môi trường local)
 └── Makefile                # Các lệnh phổ biến
@@ -139,7 +139,7 @@ src/
 ### Yêu Cầu
 
 - [Docker](https://www.docker.com/) & Docker Compose
-- Python 3.12+ (nếu chạy ngoài Docker)
+- Python 3.13 (nếu chạy ngoài Docker)
 - Node.js 20+ (nếu chạy frontend ngoài Docker)
 
 ### 1. Clone Repository
@@ -166,8 +166,8 @@ docker network create nextgen_local_nw
 
 ```bash
 # Sử dụng Makefile
-make build-local
-make up-local
+make build
+make up
 
 # Hoặc trực tiếp với Docker Compose
 docker compose -f local.yml up --build
@@ -176,7 +176,7 @@ docker compose -f local.yml up --build
 ### 5. Chạy Migrations
 
 ```bash
-make migrate-local
+make migrate
 # hoặc
 docker compose -f local.yml exec api alembic upgrade head
 ```
