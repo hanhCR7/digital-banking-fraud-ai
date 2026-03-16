@@ -1,12 +1,12 @@
-# NextGen Bank — Hệ Thống Ngân Hàng Thế Hệ Mới
+# Bamboo Bank — Hệ Thống Ngân Hàng Thế Hệ Mới
 
-> **Project Cá Nhân** — Xây dựng nền tảng ngân hàng số hiện đại tích hợp mô hình Machine Learning phát hiện gian lận giao dịch theo thời gian thực.
+> **Project Cá Nhân** — Xây dựng nền tảng ngân hàng số hiện đại tích hợp mô hình Machine Learning phát hiện gian lận giao dịch.
 
 ---
 
 ## 📋 Mục Tiêu Dự Án
 
-NextGen Bank là một hệ thống API ngân hàng số được xây dựng nhằm:
+Bamboo Bank là một hệ thống API ngân hàng số được xây dựng nhằm:
 
 - **Cung cấp dịch vụ ngân hàng cốt lõi** — Đăng ký/đăng nhập, quản lý tài khoản, gửi tiền, rút tiền, chuyển tiền nội bộ, lịch sử giao dịch, sao kê.
 - **Quản lý thẻ ảo (Virtual Card)** — Phát hành, kích hoạt, khóa, nạp tiền và hủy thẻ ảo.
