@@ -1,24 +1,24 @@
 build:
-	docker compose -p nextgen -f local.yml up --build -d --remove-orphans
+	docker compose -p bamboo -f local.yml up --build -d --remove-orphans
 
 
 up:
-	docker compose -p nextgen -f local.yml up -d
+	docker compose -p bamboo -f local.yml up -d
 
 down-v:
 	docker compose -f local.yml down -v
 
 down:
-	docker compose -p nextgen -f local.yml down
+	docker compose -p bamboo -f local.yml down
 
-nextgen-config:
+bamboo-config:
 	docker compose -f local.yml config
 
 makemigrations:
 	docker compose -f local.yml exec -it api alembic revision --autogenerate -m "$(name)"
 
 migrate:
-	docker compose -p nextgen -f local.yml exec -it api alembic upgrade head
+	docker compose -p bamboo -f local.yml exec -it api alembic upgrade head
 
 history:
 	docker compose -f local.yml exec -it api alembic history
@@ -30,9 +30,9 @@ downgrade:
 	docker compose -f local.yml exec -it api alembic downgrade $(version)
 
 inspect-network:
-	docker network inspect nextgen_local_nw
+	docker network inspect bamboo_local_nw
 
 psql:
-	docker compose -p nextgen -f local.yml exec -it postgres psql -U postgres -d nextgen_fastapi_bank
+	docker compose -p bamboo -f local.yml exec -it postgres psql -U postgres -d bamboo_fastapi_bank
 
 
