@@ -37,11 +37,8 @@ Bamboo Bank là một hệ thống API ngân hàng số được xây dựng nh�
 | Thành phần | Công nghệ |
 |---|---|
 | **ML Model** | Gradient Boosting (scikit-learn 1.6) |
-<<<<<<< HEAD
 | **ML Experiment Tracking** | [MLflow](https://mlflow.org/) 2.11.1 |
-=======
 | **ML Experiment Tracking** | [MLflow](https://mlflow.org/) 2.20 |
->>>>>>> f90b48e071f6c72f092eb181dc2a52832fea8377
 | **Data Processing** | Pandas, NumPy, SciPy |
 | **Visualization** | Matplotlib |
 
