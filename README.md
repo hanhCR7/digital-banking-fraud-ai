@@ -106,11 +106,8 @@ Mô hình Gradient Boosting chấm điểm rủi ro
 | `POST /api/v1/ml/train` | Huấn luyện mô hình mới từ dữ liệu hiện có |
 | `POST /api/v1/ml/deploy` | Triển khai thủ công một mô hình theo ID |
 | `POST /api/v1/ml/auto-deploy` | Tự động chọn và triển khai mô hình tốt nhất |
-<<<<<<< HEAD
 | `POST /api/v1/transaction/{transaction_id}/review` | Xem xét giao dịch bị gắn cờ |
-=======
 | `GET /api/v1/transaction/fraud-review` | Xem danh sách giao dịch bị gắn cờ |
->>>>>>> f90b48e071f6c72f092eb181dc2a52832fea8377
 | `GET /api/v1/transaction/risk-history` | Lịch sử điểm rủi ro của giao dịch |
 
 ---
