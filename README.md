@@ -142,11 +142,8 @@ src/
 ### Yêu Cầu
 
 - [Docker](https://www.docker.com/) & Docker Compose
-<<<<<<< HEAD
 - Python 3.13 (nếu chạy ngoài Docker)
-=======
 - Python 3.12+ (nếu chạy ngoài Docker)
->>>>>>> f90b48e071f6c72f092eb181dc2a52832fea8377
 - Node.js 20+ (nếu chạy frontend ngoài Docker)
 
 ### 1. Clone Repository
@@ -173,13 +170,10 @@ docker network create nextgen_local_nw
 
 ```bash
 # Sử dụng Makefile
-<<<<<<< HEAD
 make build
 make up
-=======
 make build-local
 make up-local
->>>>>>> f90b48e071f6c72f092eb181dc2a52832fea8377
 
 # Hoặc trực tiếp với Docker Compose
 docker compose -f local.yml up --build
@@ -188,11 +182,8 @@ docker compose -f local.yml up --build
 ### 5. Chạy Migrations
 
 ```bash
-<<<<<<< HEAD
 make migrate
-=======
 make migrate-local
->>>>>>> f90b48e071f6c72f092eb181dc2a52832fea8377
 # hoặc
 docker compose -f local.yml exec api alembic upgrade head
 ```
