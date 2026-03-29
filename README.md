@@ -128,11 +128,8 @@ src/
 │   ├── docker/             # Dockerfile cho từng môi trường
 │   └── requirements.txt
 ├── frontend/
-<<<<<<< HEAD
 │   └── nextgen_banking/    # Ứng dụng React (CRA)
-=======
 │   └── nextgen_banking/    # Ứng dụng React (Next.js)
->>>>>>> f90b48e071f6c72f092eb181dc2a52832fea8377
 ├── migrations/             # Alembic DB migrations
 ├── local.yml               # Docker Compose (môi trường local)
 └── Makefile                # Các lệnh phổ biến
